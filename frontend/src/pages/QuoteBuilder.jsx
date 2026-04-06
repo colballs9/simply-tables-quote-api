@@ -18,6 +18,7 @@ export default function QuoteBuilder() {
   const [error, setError] = useState('')
   const [recalculating, setRecalculating] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [selectedOptionId, setSelectedOptionId] = useState('')
 
   // Load or create quote
   useEffect(() => {
@@ -34,6 +35,9 @@ export default function QuoteBuilder() {
     try {
       const data = await quotes.get(id)
       setQuote(data)
+      if (!selectedOptionId && data.options?.[0]?.id) {
+        setSelectedOptionId(data.options[0].id)
+      }
     } catch (err) {
       console.error('Failed to load quote:', err)
       setError(err.message || 'Failed to load quote')
@@ -47,6 +51,9 @@ export default function QuoteBuilder() {
       const data = await quotes.create({ project_name: 'New Quote' })
       navigate(`/quotes/${data.id}`, { replace: true })
       setQuote(data)
+      if (data.options?.[0]?.id) {
+        setSelectedOptionId(data.options[0].id)
+      }
     } catch (err) {
       console.error('Failed to create quote:', err)
       setError(err.message || 'Failed to create quote')
@@ -57,6 +64,9 @@ export default function QuoteBuilder() {
   // Generic handler that refreshes quote after any mutation
   const refreshQuote = useCallback((updatedQuote) => {
     setQuote(updatedQuote)
+    if (!selectedOptionId && updatedQuote.options?.[0]?.id) {
+      setSelectedOptionId(updatedQuote.options[0].id)
+    }
   }, [])
 
   async function handleQuoteFieldChange(field, value) {
@@ -74,16 +84,16 @@ export default function QuoteBuilder() {
   }
 
   async function handleAddProduct() {
-    if (!quote || !quote.options?.[0]) {
+    const selectedOption = quote?.options?.find(o => o.id === selectedOptionId) || quote?.options?.[0]
+    if (!quote || !selectedOption) {
       setError('This quote does not have an option yet, so a product cannot be added.')
       return
     }
     setSaving(true)
     setError('')
     try {
-      const optionId = quote.options[0].id
-      const updated = await products.add(optionId, {
-        title: `Product ${(quote.options[0].products?.length || 0) + 1}`,
+      const updated = await products.add(selectedOption.id, {
+        title: `Product ${(selectedOption.products?.length || 0) + 1}`,
         material_type: 'Hardwood',
         quantity: 1,
       })
@@ -126,8 +136,21 @@ export default function QuoteBuilder() {
   if (loading) return <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
   if (!quote) return <p style={{ color: 'var(--text-muted)' }}>{error || 'Quote not found'}</p>
 
-  const option = quote.options?.[0]
-  const productList = option?.products || []
+  const options = quote.options || []
+  const activeOption = options.find(o => o.id === selectedOptionId) || options[0]
+  const productList = activeOption?.products || []
+
+  const optionTotalPrice = activeOption?.total_price ?? null
+  const optionTotalHours = activeOption?.total_hours ?? null
+  const optionTotalCost = activeOption?.total_cost ?? null
+
+  const rowLabels = [
+    'Product',
+    'Specs',
+    'Cost Blocks',
+    'Labor Blocks',
+    'Pricing Summary'
+  ]
 
   return (
     <div className="fade-in">
@@ -248,28 +271,89 @@ export default function QuoteBuilder() {
         </div>
       </div>
 
-      {/* Products */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {!option && (
-          <div className="notice notice-warning">
-            <strong>No quote option is available yet.</strong>
-            <span>This builder expects at least one option. Product creation is blocked until the backend provides an option record.</span>
+      <div className="quote-canvas-shell">
+        <aside className="quote-canvas-left">
+          <div className="canvas-panel">
+            <div className="canvas-panel-title">Option View</div>
+            {options.length > 0 ? (
+              <div className="option-tabs">
+                {options.map((opt, idx) => (
+                  <button
+                    key={opt.id}
+                    className={`option-tab ${activeOption?.id === opt.id ? 'active' : ''}`}
+                    onClick={() => setSelectedOptionId(opt.id)}
+                  >
+                    {opt.name || `Option ${idx + 1}`}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="muted-copy">No options available</p>
+            )}
           </div>
-        )}
 
-        {productList.map(product => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            optionId={option.id}
-            quoteId={quote.id}
-            onUpdate={refreshQuote}
-          />
-        ))}
+          <div className="canvas-panel">
+            <div className="canvas-panel-title">Totals</div>
+            <div className="totals-grid">
+              <div>
+                <div className="totals-label">Option Price</div>
+                <div className="totals-value">{formatPrice(optionTotalPrice)}</div>
+              </div>
+              <div>
+                <div className="totals-label">Option Hours</div>
+                <div className="totals-value hours">{optionTotalHours ? `${Number(optionTotalHours).toFixed(1)}h` : '—'}</div>
+              </div>
+              <div>
+                <div className="totals-label">Quote Price</div>
+                <div className="totals-value final">{formatPrice(quote.total_price)}</div>
+              </div>
+              <div>
+                <div className="totals-label">Quote Hours</div>
+                <div className="totals-value hours">{quote.total_hours ? `${Number(quote.total_hours).toFixed(1)}h` : '—'}</div>
+              </div>
+              <div>
+                <div className="totals-label">Quote Cost</div>
+                <div className="totals-value cost">{formatPrice(quote.total_cost)}</div>
+              </div>
+              <div>
+                <div className="totals-label">Option Cost</div>
+                <div className="totals-value cost">{formatPrice(optionTotalCost)}</div>
+              </div>
+            </div>
+          </div>
 
-        <button className="btn btn-primary" onClick={handleAddProduct} style={{ alignSelf: 'flex-start' }} disabled={saving || !option}>
-          <Plus size={16} /> Add Product
-        </button>
+          <div className="canvas-panel">
+            <div className="canvas-panel-title">Rows</div>
+            <ul className="row-label-list">
+              {rowLabels.map(label => <li key={label}>{label}</li>)}
+            </ul>
+          </div>
+        </aside>
+
+        <section className="quote-canvas-right">
+          {!activeOption && (
+            <div className="notice notice-warning" style={{ marginBottom: 12 }}>
+              <strong>No quote option is available yet.</strong>
+              <span>This builder expects at least one option. Product creation is blocked until the backend provides an option record.</span>
+            </div>
+          )}
+
+          <div className="product-columns">
+            {productList.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                optionId={activeOption?.id}
+                onUpdate={refreshQuote}
+                mode="column"
+              />
+            ))}
+
+            <button className="add-product-column" onClick={handleAddProduct} disabled={saving || !activeOption}>
+              <Plus size={16} /> Add Product
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   )
