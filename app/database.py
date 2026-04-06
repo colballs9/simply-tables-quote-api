@@ -19,14 +19,31 @@ DATABASE_URL = os.getenv(
 # For Alembic, use sync connection string
 DATABASE_URL_SYNC = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=os.getenv("SQL_ECHO", "false").lower() == "true",
-    pool_size=5,
-    max_overflow=10,
-)
+# Lazy initialization — engine created on first use, not at import time
+_engine = None
+_async_session = None
 
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+def get_engine():
+    """Get or create the async engine (lazy initialization)"""
+    global _engine
+    if _engine is None:
+        _engine = create_async_engine(
+            DATABASE_URL,
+            echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+            pool_size=5,
+            max_overflow=10,
+        )
+    return _engine
+
+
+def get_async_session():
+    """Get or create the async session factory (lazy initialization)"""
+    global _async_session
+    if _async_session is None:
+        engine = get_engine()
+        _async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    return _async_session
 
 
 class Base(DeclarativeBase):
@@ -35,7 +52,8 @@ class Base(DeclarativeBase):
 
 async def get_db():
     """FastAPI dependency — yields an async session, auto-closes."""
-    async with async_session() as session:
+    session_factory = get_async_session()
+    async with session_factory() as session:
         try:
             yield session
         finally:
@@ -58,6 +76,7 @@ async def init_db():
         if result.returncode != 0:
             print(f"Alembic upgrade failed: {result.stderr}")
             # Fallback to creating tables directly if Alembic fails
+            engine = get_engine()
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
         else:
@@ -66,6 +85,7 @@ async def init_db():
     except Exception as e:
         print(f"Error running migrations: {e}")
         # Fallback to creating tables directly
+        engine = get_engine()
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
