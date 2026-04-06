@@ -39,7 +39,6 @@ function useDebounceMap(delay = 500) {
 export default function ProductCard({ product, optionId, onUpdate, mode = 'card' }) {
   const [drafts, setDrafts] = useState({})
   const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
   const debounce = useDebounceMap()
 
   useEffect(() => () => debounce.clearAll(), [])
@@ -61,7 +60,6 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
   }
 
   async function updateProductField(field, value, key) {
-    setSaving(true)
     try {
       const updated = await products.update(optionId, product.id, { [field]: value })
       clearDraft(key)
@@ -70,7 +68,6 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
     } catch (err) {
       setError(err.message || 'Failed to update product')
     }
-    setSaving(false)
   }
 
   function onProductChange(field, value, isNumeric = false) {
@@ -91,7 +88,6 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
   }
 
   async function updateCostField(blockId, field, value, key) {
-    setSaving(true)
     try {
       const updated = await costBlocks.update(product.id, blockId, { [field]: value })
       clearDraft(key)
@@ -100,7 +96,6 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
     } catch (err) {
       setError(err.message || 'Failed to update cost block')
     }
-    setSaving(false)
   }
 
   function onCostChange(blockId, field, value, isNumeric = false, fallbackZero = false) {
@@ -121,7 +116,6 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
   }
 
   async function updateLaborField(blockId, field, value, key) {
-    setSaving(true)
     try {
       const updated = await laborBlocks.update(product.id, blockId, { [field]: value })
       clearDraft(key)
@@ -130,7 +124,6 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
     } catch (err) {
       setError(err.message || 'Failed to update labor block')
     }
-    setSaving(false)
   }
 
   function onLaborChange(blockId, field, value, isNumeric = false, fallbackZero = false) {
@@ -208,8 +201,8 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
 
       <div className="product-card-body fade-in">
         {error && <div className="notice notice-error compact-notice"><strong>Product update failed.</strong><span>{error}</span></div>}
-        {saving && <div className="muted-copy" style={{ fontSize: '0.75rem' }}>Saving changes...</div>}
 
+        <div className="subsection-title">General Specs</div>
         <div className="spec-grid">
           <div className="field"><label>Title</label><input value={productValue('title')} onChange={e => onProductChange('title', e.target.value)} onBlur={e => onProductBlur('title', e.target.value)} /></div>
           <div className="field"><label>Material</label><select value={productValue('material_type')} onChange={e => onProductChange('material_type', e.target.value)} onBlur={e => onProductBlur('material_type', e.target.value)}>{MATERIAL_TYPES.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
@@ -221,8 +214,20 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
           <div className="field"><label>Base Type</label><select value={productValue('base_type')} onChange={e => onProductChange('base_type', e.target.value)} onBlur={e => onProductBlur('base_type', e.target.value)}>{BASE_TYPES.map(b => <option key={b} value={b}>{b}</option>)}</select></div>
         </div>
 
+        <div className="subsection-title">Descriptions</div>
+        <div className="spec-grid">
+          <div className="field"><label>Material Detail</label><input value={productValue('material_detail')} onChange={e => onProductChange('material_detail', e.target.value)} onBlur={e => onProductBlur('material_detail', e.target.value)} /></div>
+          <div className="field"><label>Edge Profile</label><input value={productValue('edge_profile')} onChange={e => onProductChange('edge_profile', e.target.value)} onBlur={e => onProductBlur('edge_profile', e.target.value)} /></div>
+          <div className="field"><label>Stain / Color</label><input value={productValue('stain_or_color')} onChange={e => onProductChange('stain_or_color', e.target.value)} onBlur={e => onProductBlur('stain_or_color', e.target.value)} /></div>
+          <div className="field"><label>Color Name</label><input value={productValue('color_name')} onChange={e => onProductChange('color_name', e.target.value)} onBlur={e => onProductBlur('color_name', e.target.value)} /></div>
+          <div className="field"><label>Sheen</label><input value={productValue('sheen')} onChange={e => onProductChange('sheen', e.target.value)} onBlur={e => onProductBlur('sheen', e.target.value)} /></div>
+          <div className="field"><label>Notes</label><input value={productValue('notes')} onChange={e => onProductChange('notes', e.target.value)} onBlur={e => onProductBlur('notes', e.target.value)} /></div>
+        </div>
+
+        <div className="subsection-title">Cost Blocks</div>
         <div className="blocks-section cost-section">
           <div className="blocks-section-header"><span className="blocks-section-title">Cost Blocks</span><button className="btn btn-cost btn-sm" onClick={handleAddCostBlock}><Plus size={14} /> Add Cost</button></div>
+          <p className="muted-copy" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Fixed = Cost/Unit x Units. For a flat $200 block: fixed, Units 1, Cost/Unit 200.</p>
           {product.cost_blocks?.length > 0 ? (
             <>
               <div className="block-row block-row-cost block-row-header"><span>Description</span><span>Category</span><span>Multiplier</span><span>Units</span><span>Cost/Unit</span><span>Cost PP</span><span></span></div>
@@ -241,6 +246,7 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
           ) : <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '8px 0' }}>No cost blocks yet</p>}
         </div>
 
+        <div className="subsection-title">Labor Blocks</div>
         <div className="blocks-section hours-section">
           <div className="blocks-section-header"><span className="blocks-section-title">Labor Blocks</span><button className="btn btn-hours btn-sm" onClick={handleAddLaborBlock}><Plus size={14} /> Add Hours</button></div>
           {product.labor_blocks?.length > 0 ? (
@@ -260,6 +266,7 @@ export default function ProductCard({ product, optionId, onUpdate, mode = 'card'
           ) : <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '8px 0' }}>No labor blocks yet</p>}
         </div>
 
+        <div className="subsection-title">Final Pricing</div>
         <div className="pricing-summary">
           <div className="pricing-item"><span className="label">Material Cost</span><span className="value" style={{ color: 'var(--cost-text)' }}>{formatPrice(product.total_material_cost)}</span></div>
           <div className="pricing-item"><span className="label">Hours</span><span className="value" style={{ color: 'var(--hours-text)' }}>{product.total_hours_pp ? `${Number(product.total_hours_pp).toFixed(2)}h` : '--'}</span></div>

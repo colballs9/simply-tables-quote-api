@@ -514,6 +514,15 @@ a:hover { color: var(--green-200); }
   gap: 12px;
 }
 
+.subsection-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: -8px;
+}
+
 /* ── Form Fields ── */
 .field {
   display: flex;

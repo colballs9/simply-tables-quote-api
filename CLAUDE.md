@@ -5,7 +5,7 @@
 A web-based quoting tool for **Simply Tables**, a custom furniture manufacturing business. This replaces (and will eventually supersede) a Google Sheets-based quoting system that has 1,682 rows of formulas across 22 columns.
 
 **Owner:** Colin Kettler  
-**Stack:** Python (FastAPI) + PostgreSQL + React (planned)  
+**Stack:** Python (FastAPI) + PostgreSQL + React (Vite)  
 **Hosting:** Google Cloud Platform (Cloud Run + Cloud SQL)  
 **GCP Project:** `onyx-antler-483815-i1` (same project as the existing procurement automation service)  
 **Region:** `us-central1`
@@ -16,19 +16,34 @@ A web-based quoting tool for **Simply Tables**, a custom furniture manufacturing
 
 ### What's Built (April 2026)
 
-Three layers are complete and tested locally — **nothing is deployed yet**.
+Core layers are live and actively deployed:
 
-1. **Database Schema** (`schema_v1.sql`) — 16 PostgreSQL tables
-2. **Calculation Engine** (`calc_engine.py`) — Pure Python, 27 tests passing
-3. **FastAPI Backend** (`app/`) — 21 REST endpoints, all imports verified
+1. **Database Schema** (`schema_v1.sql`) — Cloud SQL Postgres backing the API
+2. **Calculation Engine** (`calc_engine.py`) — Production API uses this engine for recalculation
+3. **FastAPI Backend** (`app/`) — Deployed on Cloud Run (`simply-tables-quote-api`)
+4. **React Frontend** (`frontend/`) — Built in Docker and served by FastAPI from `frontend/dist`
+
+### Current Deployment Reality
+
+1. Cloud Run service exists: `simply-tables-quote-api` (`us-central1`)
+2. API routes are under `/api/*`
+3. Frontend is served from `/` by FastAPI static mount
+4. Health endpoint: `/health`
+5. DATABASE_URL must use the async driver form: `postgresql+asyncpg://...`
+6. Product columns in Quote Builder are rendered in deterministic order (`sort_order`, then `id`) to avoid visual swapping while editing
 
 ### What Needs To Happen Next
 
-1. **Create Cloud SQL Postgres instance** in `onyx-antler-483815-i1`
-2. **Deploy FastAPI app to Cloud Run** as a new service (e.g., `quote-api`)
-3. **Run the schema** against the database
-4. **Seed reference data** (material context, stock base catalog)
-5. **Build React frontend** (future phase)
+1. Continue frontend workflow improvements (options/products UX, catalog/settings pages)
+2. Populate/maintain reference tables (material context, base catalog)
+3. Transition from `metadata.create_all` bootstrap pattern to strict Alembic migration workflow
+4. Add regression tests for API + frontend integration paths
+
+### Frontend UX Notes (Current)
+
+1. Quote Builder now uses a horizontal, column-based product canvas for spreadsheet-like editing
+2. Each product editor is sectioned: General Specs, Descriptions, Cost Blocks, Labor Blocks, Final Pricing
+3. Cost block helper text explicitly documents `fixed` behavior: `cost_pp = cost_per_unit * units_per_product`
 
 ---
 
@@ -45,7 +60,7 @@ There is already a Cloud Run service in this project for procurement automation:
 
 The quote API should be a **separate Cloud Run service** in the same project, potentially with its own service account.
 
-### Cloud Run Deploy Pattern (from procurement service)
+### Cloud Run Deploy Pattern (quote service)
 
 ```bash
 gcloud run deploy quote-api \
@@ -56,6 +71,16 @@ gcloud run deploy quote-api \
 ```
 
 Note: `--timeout=900` and env vars persist between `--source .` redeployments.
+
+### Cloud Build Note (frontend)
+
+When building frontend assets in Docker, the builder stage must install **dev dependencies** (`vite` is a dev dependency). Use:
+
+```dockerfile
+RUN npm ci || npm install
+```
+
+Do not use `npm ci --omit=dev` in the frontend build stage.
 
 ---
 

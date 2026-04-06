@@ -139,6 +139,12 @@ export default function QuoteBuilder() {
   const options = quote.options || []
   const activeOption = options.find(o => o.id === selectedOptionId) || options[0]
   const productList = activeOption?.products || []
+  const sortedProductList = [...productList].sort((a, b) => {
+    const aSort = Number.isFinite(a.sort_order) ? a.sort_order : 0
+    const bSort = Number.isFinite(b.sort_order) ? b.sort_order : 0
+    if (aSort !== bSort) return aSort - bSort
+    return String(a.id || '').localeCompare(String(b.id || ''))
+  })
 
   const optionTotalPrice = activeOption?.total_price ?? null
   const optionTotalHours = activeOption?.total_hours ?? null
@@ -339,7 +345,7 @@ export default function QuoteBuilder() {
           )}
 
           <div className="product-columns">
-            {productList.map(product => (
+            {sortedProductList.map(product => (
               <ProductCard
                 key={product.id}
                 product={product}
