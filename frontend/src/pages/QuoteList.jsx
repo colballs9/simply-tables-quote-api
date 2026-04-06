@@ -16,6 +16,8 @@ function formatPrice(val) {
 export default function QuoteList() {
   const [quoteList, setQuoteList] = useState([])
   const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
   const [filter, setFilter] = useState('')
   const navigate = useNavigate()
 
@@ -25,22 +27,28 @@ export default function QuoteList() {
 
   async function loadQuotes() {
     setLoading(true)
+    setError('')
     try {
       const data = await quotes.list(filter || undefined)
       setQuoteList(data)
     } catch (err) {
       console.error('Failed to load quotes:', err)
+      setError(err.message || 'Failed to load quotes')
     }
     setLoading(false)
   }
 
   async function handleNewQuote() {
+    setCreating(true)
+    setError('')
     try {
       const quote = await quotes.create({ project_name: 'New Quote' })
       navigate(`/quotes/${quote.id}`)
     } catch (err) {
       console.error('Failed to create quote:', err)
+      setError(err.message || 'Failed to create quote')
     }
+    setCreating(false)
   }
 
   return (
@@ -50,14 +58,25 @@ export default function QuoteList() {
           <h1 className="page-title">Quotes</h1>
           <p className="page-subtitle">{quoteList.length} quote{quoteList.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="btn btn-primary" onClick={handleNewQuote}>
-          <Plus size={16} /> New Quote
-        </button>
+        <div className="page-actions">
+          <button className="btn btn-ghost" onClick={loadQuotes} disabled={loading}>
+            Refresh
+          </button>
+          <button className="btn btn-primary" onClick={handleNewQuote} disabled={creating}>
+            <Plus size={16} /> {creating ? 'Creating...' : 'New Quote'}
+          </button>
+        </div>
       </div>
 
-      {/* Status filter */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {['', 'draft', 'quoted', 'won', 'lost'].map(s => (
+      {error && (
+        <div className="notice notice-error">
+          <strong>Couldn’t complete that request.</strong>
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {['', 'draft', 'quoted', 'won', 'lost', 'active', 'approved'].map(s => (
           <button
             key={s}
             className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-ghost'}`}
@@ -73,8 +92,8 @@ export default function QuoteList() {
       ) : quoteList.length === 0 ? (
         <div className="empty-state">
           <FileText size={48} />
-          <p>No quotes yet</p>
-          <button className="btn btn-primary" onClick={handleNewQuote}>
+          <p>{filter ? `No ${filter} quotes yet` : 'No quotes yet'}</p>
+          <button className="btn btn-primary" onClick={handleNewQuote} disabled={creating}>
             <Plus size={16} /> Create your first quote
           </button>
         </div>

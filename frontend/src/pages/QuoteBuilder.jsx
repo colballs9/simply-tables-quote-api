@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ChevronDown, ChevronRight, Trash2, ArrowLeft } from 'lucide-react'
-import { quotes, products, costBlocks, laborBlocks } from '../api/client'
+import { Plus, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react'
+import { quotes, products } from '../api/client'
 import ProductCard from '../components/ProductCard'
 
 function formatPrice(val) {
@@ -15,6 +15,9 @@ export default function QuoteBuilder() {
   const [quote, setQuote] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [recalculating, setRecalculating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Load or create quote
   useEffect(() => {
@@ -27,22 +30,26 @@ export default function QuoteBuilder() {
 
   async function loadQuote(id) {
     setLoading(true)
+    setError('')
     try {
       const data = await quotes.get(id)
       setQuote(data)
     } catch (err) {
       console.error('Failed to load quote:', err)
+      setError(err.message || 'Failed to load quote')
     }
     setLoading(false)
   }
 
   async function createQuote() {
+    setError('')
     try {
       const data = await quotes.create({ project_name: 'New Quote' })
       navigate(`/quotes/${data.id}`, { replace: true })
       setQuote(data)
     } catch (err) {
       console.error('Failed to create quote:', err)
+      setError(err.message || 'Failed to create quote')
     }
     setLoading(false)
   }
@@ -55,18 +62,24 @@ export default function QuoteBuilder() {
   async function handleQuoteFieldChange(field, value) {
     if (!quote) return
     setSaving(true)
+    setError('')
     try {
       const updated = await quotes.update(quote.id, { [field]: value })
       setQuote(updated)
     } catch (err) {
       console.error('Failed to update quote:', err)
+      setError(err.message || 'Failed to update quote')
     }
     setSaving(false)
   }
 
   async function handleAddProduct() {
-    if (!quote || !quote.options?.[0]) return
+    if (!quote || !quote.options?.[0]) {
+      setError('This quote does not have an option yet, so a product cannot be added.')
+      return
+    }
     setSaving(true)
+    setError('')
     try {
       const optionId = quote.options[0].id
       const updated = await products.add(optionId, {
@@ -77,12 +90,41 @@ export default function QuoteBuilder() {
       setQuote(updated)
     } catch (err) {
       console.error('Failed to add product:', err)
+      setError(err.message || 'Failed to add product')
     }
     setSaving(false)
   }
 
+  async function handleRecalculate() {
+    if (!quote) return
+    setRecalculating(true)
+    setError('')
+    try {
+      const updated = await quotes.recalculate(quote.id)
+      setQuote(updated)
+    } catch (err) {
+      console.error('Failed to recalculate quote:', err)
+      setError(err.message || 'Failed to recalculate quote')
+    }
+    setRecalculating(false)
+  }
+
+  async function handleDeleteQuote() {
+    if (!quote || !window.confirm('Delete this quote? This cannot be undone.')) return
+    setDeleting(true)
+    setError('')
+    try {
+      await quotes.delete(quote.id)
+      navigate('/')
+    } catch (err) {
+      console.error('Failed to delete quote:', err)
+      setError(err.message || 'Failed to delete quote')
+      setDeleting(false)
+    }
+  }
+
   if (loading) return <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
-  if (!quote) return <p style={{ color: 'var(--text-muted)' }}>Quote not found</p>
+  if (!quote) return <p style={{ color: 'var(--text-muted)' }}>{error || 'Quote not found'}</p>
 
   const option = quote.options?.[0]
   const productList = option?.products || []
@@ -126,18 +168,38 @@ export default function QuoteBuilder() {
         </div>
 
         {/* Quote-level total */}
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Quote Total
+        <div className="quote-header-actions">
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Quote Total
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--green-300)' }}>
+              {formatPrice(quote.total_price)}
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--hours-text)' }}>
+              {quote.total_hours ? `${Number(quote.total_hours).toFixed(1)} hours` : ''}
+            </div>
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--green-300)' }}>
-            {formatPrice(quote.total_price)}
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--hours-text)' }}>
-            {quote.total_hours ? `${Number(quote.total_hours).toFixed(1)} hours` : ''}
+          <div className="page-actions">
+            <button className="btn btn-ghost" onClick={() => loadQuote(quote.id)} disabled={loading || saving || recalculating}>
+              Refresh
+            </button>
+            <button className="btn btn-secondary" onClick={handleRecalculate} disabled={saving || recalculating}>
+              <RefreshCw size={16} /> {recalculating ? 'Recalculating...' : 'Recalculate'}
+            </button>
+            <button className="btn btn-danger" onClick={handleDeleteQuote} disabled={deleting || saving}>
+              <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Quote'}
+            </button>
           </div>
         </div>
       </div>
+
+      {error && (
+        <div className="notice notice-error" style={{ marginBottom: 20 }}>
+          <strong>Something needs attention.</strong>
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Quote settings bar */}
       <div className="card" style={{ marginBottom: 24, padding: '14px 20px' }}>
@@ -188,6 +250,13 @@ export default function QuoteBuilder() {
 
       {/* Products */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {!option && (
+          <div className="notice notice-warning">
+            <strong>No quote option is available yet.</strong>
+            <span>This builder expects at least one option. Product creation is blocked until the backend provides an option record.</span>
+          </div>
+        )}
+
         {productList.map(product => (
           <ProductCard
             key={product.id}
@@ -198,7 +267,7 @@ export default function QuoteBuilder() {
           />
         ))}
 
-        <button className="btn btn-primary" onClick={handleAddProduct} style={{ alignSelf: 'flex-start' }}>
+        <button className="btn btn-primary" onClick={handleAddProduct} style={{ alignSelf: 'flex-start' }} disabled={saving || !option}>
           <Plus size={16} /> Add Product
         </button>
       </div>

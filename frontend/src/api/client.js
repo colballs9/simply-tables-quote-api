@@ -7,6 +7,21 @@
 
 const BASE = '/api';
 
+async function getErrorMessage(res) {
+  const contentType = res.headers.get('content-type') || ''
+
+  if (contentType.includes('application/json')) {
+    const error = await res.json().catch(() => null)
+    if (typeof error?.detail === 'string') return error.detail
+    if (Array.isArray(error?.detail)) {
+      return error.detail.map(item => item.msg || item.message || 'Validation error').join(', ')
+    }
+  }
+
+  const text = await res.text().catch(() => '')
+  return text || res.statusText || `API error: ${res.status}`
+}
+
 async function request(path, options = {}) {
   const url = `${BASE}${path}`;
   const config = {
@@ -21,8 +36,7 @@ async function request(path, options = {}) {
   const res = await fetch(url, config);
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `API error: ${res.status}`);
+    throw new Error(await getErrorMessage(res));
   }
 
   if (res.status === 204) return null;

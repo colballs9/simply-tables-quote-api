@@ -27,14 +27,22 @@ function useDebounce(fn, delay = 500) {
 export default function ProductCard({ product, optionId, quoteId, onUpdate }) {
   const [expanded, setExpanded] = useState(true)
   const [localFields, setLocalFields] = useState({})
+  const [error, setError] = useState('')
 
   // Debounced save for product fields
   const debouncedSave = useDebounce(async (field, value) => {
     try {
       const updated = await products.update(optionId, product.id, { [field]: value })
+      setLocalFields(prev => {
+        const next = { ...prev }
+        delete next[field]
+        return next
+      })
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to update product:', err)
+      setError(err.message || 'Failed to update product')
     }
   }, 600)
 
@@ -53,9 +61,11 @@ export default function ProductCard({ product, optionId, quoteId, onUpdate }) {
     if (!confirm('Delete this product?')) return
     try {
       const updated = await products.delete(optionId, product.id)
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to delete product:', err)
+      setError(err.message || 'Failed to delete product')
     }
   }
 
@@ -69,27 +79,33 @@ export default function ProductCard({ product, optionId, quoteId, onUpdate }) {
         multiplier_type: 'fixed',
         units_per_product: 1,
       })
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to add cost block:', err)
+      setError(err.message || 'Failed to add cost block')
     }
   }
 
   async function handleCostBlockChange(blockId, field, value) {
     try {
       const updated = await costBlocks.update(product.id, blockId, { [field]: value })
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to update cost block:', err)
+      setError(err.message || 'Failed to update cost block')
     }
   }
 
   async function handleDeleteCostBlock(blockId) {
     try {
       const updated = await costBlocks.delete(product.id, blockId)
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to delete cost block:', err)
+      setError(err.message || 'Failed to delete cost block')
     }
   }
 
@@ -103,27 +119,33 @@ export default function ProductCard({ product, optionId, quoteId, onUpdate }) {
         hours_per_unit: 0,
         is_active: true,
       })
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to add labor block:', err)
+      setError(err.message || 'Failed to add labor block')
     }
   }
 
   async function handleLaborBlockChange(blockId, field, value) {
     try {
       const updated = await laborBlocks.update(product.id, blockId, { [field]: value })
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to update labor block:', err)
+      setError(err.message || 'Failed to update labor block')
     }
   }
 
   async function handleDeleteLaborBlock(blockId) {
     try {
       const updated = await laborBlocks.delete(product.id, blockId)
+      setError('')
       onUpdate(updated)
     } catch (err) {
       console.error('Failed to delete labor block:', err)
+      setError(err.message || 'Failed to delete labor block')
     }
   }
 
@@ -158,6 +180,13 @@ export default function ProductCard({ product, optionId, quoteId, onUpdate }) {
       {/* Body — expandable */}
       {expanded && (
         <div className="product-card-body fade-in">
+          {error && (
+            <div className="notice notice-error compact-notice">
+              <strong>Product update failed.</strong>
+              <span>{error}</span>
+            </div>
+          )}
+
           {/* ── Specs ── */}
           <div className="spec-grid">
             <div className="field">
