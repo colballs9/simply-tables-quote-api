@@ -6,3 +6,4 @@ psycopg2-binary==2.9.11
 pydantic==2.9.2
 cloud-sql-python-connector[asyncpg]==1.12.1
 alembic==1.16.5
+aiofiles==24.1.0
