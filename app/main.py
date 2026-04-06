@@ -38,6 +38,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",        # React dev server
         "http://localhost:5173",        # Vite dev server
+        "http://localhost:8000",        # local static file server
+        "http://127.0.0.1:8000",        # local static file server
+        "null",                         # file:// origin for local HTML dev
         "https://quote.simplytables.com",  # future production
     ],
     allow_credentials=True,
