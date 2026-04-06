@@ -10,6 +10,14 @@ A web-based quoting tool for **Simply Tables**, a custom furniture manufacturing
 **GCP Project:** `onyx-antler-483815-i1` (same project as the existing procurement automation service)  
 **Region:** `us-central1`
 
+## Read This First (Agent Handoff)
+
+Before making changes, read in this order:
+
+1. `CLAUDE.md`
+2. `DEPLOYMENT_NOTES.md`
+3. `BUILD_PLAN.md`
+
 ---
 
 ## Current State

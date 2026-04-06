@@ -1,5 +1,7 @@
 # Quote API Deployment Notes
 
+For future chat handoff and safe build workflow, read `BUILD_PLAN.md` first.
+
 **Current state (Apr 6, 2026):**
 - Deployed to Cloud Run service: `simply-tables-quote-api` (`us-central1`)
 - Backend + frontend are in one container image
