@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY calc_engine.py .
+COPY schema_v1.sql .
 COPY app/ app/
 COPY alembic/ alembic/
 COPY alembic.ini .

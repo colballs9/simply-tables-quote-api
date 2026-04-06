@@ -3,29 +3,39 @@ Database connection and session management.
 
 Uses SQLAlchemy async with asyncpg driver.
 Connection string configured via environment variable.
-Runs Alembic migrations on startup.
+
+IMPORTANT: DATABASE_URL must use postgresql+asyncpg:// prefix.
+If your env var uses postgresql://, it is auto-converted below.
 """
 
 import os
-import subprocess
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-DATABASE_URL = os.getenv(
+# Read and fix the DATABASE_URL
+_raw_url = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://postgres:postgres@localhost:5432/simply_tables"
 )
 
-# For Alembic, use sync connection string
+# Auto-fix: if someone set postgresql:// without +asyncpg, fix it
+if _raw_url.startswith("postgresql://"):
+    DATABASE_URL = _raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif _raw_url.startswith("postgres://"):
+    DATABASE_URL = _raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+else:
+    DATABASE_URL = _raw_url
+
+# Sync URL for Alembic (used when running alembic commands separately)
 DATABASE_URL_SYNC = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
-# Lazy initialization — engine created on first use, not at import time
+# Lazy engine — created on first use, not at import time
 _engine = None
 _async_session = None
 
 
 def get_engine():
-    """Get or create the async engine (lazy initialization)"""
+    """Get or create the async engine."""
     global _engine
     if _engine is None:
         _engine = create_async_engine(
@@ -38,7 +48,7 @@ def get_engine():
 
 
 def get_async_session():
-    """Get or create the async session factory (lazy initialization)"""
+    """Get or create the async session factory."""
     global _async_session
     if _async_session is None:
         engine = get_engine()
@@ -61,31 +71,21 @@ async def get_db():
 
 
 async def init_db():
-    """Run Alembic migrations on startup."""
+    """
+    Create tables if they don't exist.
+    
+    Uses SQLAlchemy metadata.create_all which is safe to run repeatedly —
+    it only creates tables that don't already exist.
+    
+    For schema migrations, run Alembic separately:
+        alembic upgrade head
+    """
     try:
-        # Run Alembic upgrade to latest
-        result = subprocess.run(
-            ["alembic", "upgrade", "head"],
-            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            env={**os.environ, "DATABASE_URL": DATABASE_URL_SYNC},
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-
-        if result.returncode != 0:
-            print(f"Alembic upgrade failed: {result.stderr}")
-            # Fallback to creating tables directly if Alembic fails
-            engine = get_engine()
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-        else:
-            print("Database migrations completed successfully")
-
-    except Exception as e:
-        print(f"Error running migrations: {e}")
-        # Fallback to creating tables directly
         engine = get_engine()
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-
+        print(f"Database initialized successfully (connected to {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'local'})")
+    except Exception as e:
+        print(f"WARNING: Database init failed: {e}")
+        print("The app will start but database operations will fail.")
+        print(f"DATABASE_URL starts with: {DATABASE_URL[:30]}...")
