@@ -3,7 +3,7 @@ FROM node:20-slim AS frontend-builder
 
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --omit=dev || npm install
+RUN npm ci || npm install
 COPY frontend/ ./
 RUN npm run build
 
