@@ -15,12 +15,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
+from .migrations import run_migrations
 from .routers import quotes, products, cost_blocks, labor_blocks, group_pools, catalog
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create tables on startup."""
+    """Run migrations and init database on startup."""
+    run_migrations()
     await init_db()
     yield
 
