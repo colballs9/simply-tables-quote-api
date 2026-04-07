@@ -765,6 +765,11 @@ async def recalculate_quote(db: AsyncSession, quote_id: uuid.UUID) -> Quote | No
     # Rate labor pipeline: ensure built-in rate labor blocks exist
     await manage_rate_labor_pipeline(db, quote)
 
+    # Reload after pipelines — they may have created new blocks/members
+    # that aren't eagerly loaded on the original quote object
+    await db.flush()
+    quote = await load_full_quote(db, quote_id)
+
     tags = await load_tags(db)
     engine_input = quote_to_engine_format(quote, tags)
     engine_result = compute_quote(engine_input)
