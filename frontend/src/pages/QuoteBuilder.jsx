@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react'
 import { quotes, products } from '../api/client'
-import ProductCard from '../components/ProductCard'
 import SidePanel from '../components/SidePanel'
 import QuoteCanvas from '../components/QuoteCanvas'
 
@@ -23,6 +22,10 @@ export default function QuoteBuilder() {
   const [selectedOptionId, setSelectedOptionId] = useState('')
   const [selectedProductId, setSelectedProductId] = useState(null)
 
+  // Local project name with debounced save
+  const [localProjectName, setLocalProjectName] = useState('')
+  const projectNameTimerRef = useRef(null)
+
   // Load or create quote
   useEffect(() => {
     if (quoteId) {
@@ -38,6 +41,7 @@ export default function QuoteBuilder() {
     try {
       const data = await quotes.get(id)
       setQuote(data)
+      setLocalProjectName(data.project_name || '')
       if (!selectedOptionId && data.options?.[0]?.id) {
         setSelectedOptionId(data.options[0].id)
       }
@@ -54,6 +58,7 @@ export default function QuoteBuilder() {
       const data = await quotes.create({ project_name: 'New Quote' })
       navigate(`/quotes/${data.id}`, { replace: true })
       setQuote(data)
+      setLocalProjectName(data.project_name || '')
       if (data.options?.[0]?.id) {
         setSelectedOptionId(data.options[0].id)
       }
@@ -67,10 +72,42 @@ export default function QuoteBuilder() {
   // Generic handler that refreshes quote after any mutation
   const refreshQuote = useCallback((updatedQuote) => {
     setQuote(updatedQuote)
-    if (!selectedOptionId && updatedQuote.options?.[0]?.id) {
-      setSelectedOptionId(updatedQuote.options[0].id)
-    }
+    // Sync project name from server only if user isn't actively editing
+    // (the input has its own local state with debounce)
+    setSelectedOptionId(prev => {
+      if (!prev && updatedQuote.options?.[0]?.id) {
+        return updatedQuote.options[0].id
+      }
+      return prev
+    })
   }, [])
+
+  // Debounced project name save
+  function handleProjectNameChange(value) {
+    setLocalProjectName(value)
+    clearTimeout(projectNameTimerRef.current)
+    projectNameTimerRef.current = setTimeout(() => {
+      saveProjectName(value)
+    }, 600)
+  }
+
+  function handleProjectNameBlur() {
+    clearTimeout(projectNameTimerRef.current)
+    saveProjectName(localProjectName)
+  }
+
+  async function saveProjectName(value) {
+    if (!quote || value === quote.project_name) return
+    setSaving(true)
+    try {
+      const updated = await quotes.update(quote.id, { project_name: value })
+      setQuote(updated)
+    } catch (err) {
+      console.error('Failed to save project name:', err)
+      setError(err.message || 'Failed to save project name')
+    }
+    setSaving(false)
+  }
 
   async function handleQuoteFieldChange(field, value) {
     if (!quote) return
@@ -82,28 +119,6 @@ export default function QuoteBuilder() {
     } catch (err) {
       console.error('Failed to update quote:', err)
       setError(err.message || 'Failed to update quote')
-    }
-    setSaving(false)
-  }
-
-  async function handleAddProduct() {
-    const selectedOption = quote?.options?.find(o => o.id === selectedOptionId) || quote?.options?.[0]
-    if (!quote || !selectedOption) {
-      setError('This quote does not have an option yet, so a product cannot be added.')
-      return
-    }
-    setSaving(true)
-    setError('')
-    try {
-      const updated = await products.add(selectedOption.id, {
-        title: `Product ${(selectedOption.products?.length || 0) + 1}`,
-        material_type: 'Hardwood',
-        quantity: 1,
-      })
-      setQuote(updated)
-    } catch (err) {
-      console.error('Failed to add product:', err)
-      setError(err.message || 'Failed to add product')
     }
     setSaving(false)
   }
@@ -141,13 +156,6 @@ export default function QuoteBuilder() {
 
   const options = quote.options || []
   const activeOption = options.find(o => o.id === selectedOptionId) || options[0]
-  const productList = activeOption?.products || []
-  const sortedProductList = [...productList].sort((a, b) => {
-    const aSort = Number.isFinite(a.sort_order) ? a.sort_order : 0
-    const bSort = Number.isFinite(b.sort_order) ? b.sort_order : 0
-    if (aSort !== bSort) return aSort - bSort
-    return String(a.id || '').localeCompare(String(b.id || ''))
-  })
 
   return (
     <div className="fade-in">
@@ -172,10 +180,10 @@ export default function QuoteBuilder() {
                   borderBottom: '2px solid transparent',
                   width: '400px',
                 }}
-                value={quote.project_name}
-                onChange={e => handleQuoteFieldChange('project_name', e.target.value)}
+                value={localProjectName}
+                onChange={e => handleProjectNameChange(e.target.value)}
+                onBlur={handleProjectNameBlur}
                 onFocus={e => e.target.style.borderBottomColor = 'var(--accent)'}
-                onBlur={e => e.target.style.borderBottomColor = 'transparent'}
                 placeholder="Project name..."
               />
               <span className={`status-badge ${quote.status}`}>{quote.status}</span>

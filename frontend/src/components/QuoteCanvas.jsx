@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { products, quoteBlocks } from '../api/client'
 import ProductHeaderRow from './ProductHeaderRow'
@@ -16,6 +16,7 @@ function stableSort(items) {
 }
 
 export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, selectedProductId, onProductSelect }) {
+  const [error, setError] = useState(null)
   const productList = activeOption?.products || []
 
   // Memoize sorted lists so child components get stable references
@@ -32,7 +33,11 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, select
   )
 
   async function handleAddProduct() {
-    if (!activeOption) return
+    if (!activeOption) {
+      setError('No option available — cannot add product')
+      return
+    }
+    setError(null)
     try {
       const updated = await products.add(activeOption.id, {
         title: `Product ${(productList.length || 0) + 1}`,
@@ -42,6 +47,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, select
       onQuoteUpdate(updated)
     } catch (err) {
       console.error('Failed to add product:', err)
+      setError(err.message || 'Failed to add product')
     }
   }
 
@@ -75,6 +81,11 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, select
 
   return (
     <div className="canvas-grid-wrapper">
+      {error && (
+        <div className="notice notice-error compact-notice" style={{ marginBottom: 8 }}>
+          <span>{error}</span>
+        </div>
+      )}
       <div
         className="canvas-grid"
         style={{
