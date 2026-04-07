@@ -50,6 +50,16 @@ QUARTER_CODE_LOOKUP: dict[str, str] = {
     '2.5"':  "10/4",
 }
 
+# Component raw thickness (inches) → quarter code
+# Used by Material Builder to derive species_key for plank/leg components.
+# Raw thickness is the actual rough-sawn dimension (e.g. 8/4 board = 2.0" rough).
+COMPONENT_QUARTER_CODE_LOOKUP: dict[str, str] = {
+    "1.0": "4/4",
+    "1.5": "6/4",
+    "2.0": "8/4",
+    "2.5": "10/4",
+}
+
 # Margin rate field name → cost_category mapping
 # Determines which margin rate applies to each cost category
 MARGIN_CATEGORY_MAP: dict[str, str] = {
@@ -98,13 +108,17 @@ def _round4(value: Decimal) -> Decimal:
 def compute_dimensions(product: dict) -> dict:
     """
     Compute sq_ft and bd_ft from product specs.
-    
-    Returns dict with: sq_ft, bd_ft, raw_thickness, quarter_code
-    
+
+    Returns dict with: sq_ft, sq_ft_wl, bd_ft, raw_thickness, quarter_code
+
     Sheet formulas:
-        Row 55: SqFt = (Width/12) × (Length/12)
-        Row 56: SqFt if DIA = π × (Width/24)²
+        Row 55: SqFt = (Width/12) × (Length/12)  ← sq_ft_wl, used for group pools + rate labor
+        Row 56: SqFt if DIA = π × (Width/24)²    ← sq_ft, used for material cost (per_sqft blocks)
         Row 54: BdFt = (Width × Length × RawThickness / 144) × 1.3
+
+    IMPORTANT: sq_ft_wl is always W×L regardless of shape. Group cost/labor pools and
+    rate-based labor blocks use sq_ft_wl (matching the sheet). Per-sqft cost blocks
+    (material pricing) use sq_ft which is DIA-adjusted for circular tops.
     """
     width = _d(product.get("width"))
     length = _d(product.get("length"))
@@ -112,15 +126,19 @@ def compute_dimensions(product: dict) -> dict:
     thickness_str = product.get("lumber_thickness", "")
     material_type = product.get("material_type", "")
 
-    # Square footage
+    # W×L square footage — always used for group pools and rate labor (sheet row 55)
+    if width > 0 and length > 0:
+        sq_ft_wl = _round4((width / Decimal("12")) * (length / Decimal("12")))
+    else:
+        sq_ft_wl = Decimal("0")
+
+    # DIA-adjusted square footage — used for per_sqft material cost blocks (sheet row 56)
     if shape == "DIA":
         # Circular: π × (diameter/24)² — diameter is in the width field
         radius_ft = width / Decimal("24")
         sq_ft = _round4(Decimal(str(math.pi)) * radius_ft * radius_ft)
-    elif width > 0 and length > 0:
-        sq_ft = _round4((width / Decimal("12")) * (length / Decimal("12")))
     else:
-        sq_ft = Decimal("0")
+        sq_ft = sq_ft_wl
 
     # Board footage (hardwood and live edge only)
     bd_ft = Decimal("0")
@@ -138,6 +156,7 @@ def compute_dimensions(product: dict) -> dict:
 
     return {
         "sq_ft": sq_ft,
+        "sq_ft_wl": sq_ft_wl,
         "bd_ft": bd_ft,
         "raw_thickness": raw_thickness,
         "quarter_code": quarter_code,
@@ -182,7 +201,107 @@ def compute_dimension_string(product: dict) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 2. Unit Cost Block
+# 2. Component Dimensions (Material Builder)
+# ──────────────────────────────────────────────────────────────────────
+
+def compute_component(component: dict, product: dict) -> dict:
+    """
+    Compute bdft and sqft for a single product component (Material Builder).
+
+    Feeds into:
+    - Species pipeline: plank/leg/apron components contribute bdft to their species_key
+    - Panel data pipeline: plank/leg components add sqft + count to panel totals
+
+    Waste factor: WASTE_FACTOR_BASE (1.25×) for base components.
+    NOTE: Known discrepancy vs tops (1.3×). Matches current sheet behavior.
+
+    Sheet reference: Rows 131–201 (Hardwood Base Material Builder).
+    """
+    width = _d(component.get("width", 0))
+    length = _d(component.get("length", 0))
+    thickness = _d(component.get("thickness", 0))   # raw lumber inches
+    qty_per_base = int(component.get("qty_per_base", 1) or 1)
+    bases_per_top = int(product.get("bases_per_top", 1) or 1)
+
+    # Board footage per piece: (W × L × T / 144) × waste
+    if width > 0 and length > 0 and thickness > 0:
+        bd_ft_per_piece = _round4(
+            (width * length * thickness / Decimal("144")) * WASTE_FACTOR_BASE
+        )
+    else:
+        bd_ft_per_piece = Decimal("0")
+
+    # Per product (one table): pieces_per_base × bases_per_top
+    bd_ft_pp = _round4(bd_ft_per_piece * qty_per_base * bases_per_top)
+
+    # Square footage
+    if width > 0 and length > 0:
+        sq_ft_per_piece = _round4((width * length) / Decimal("144"))
+    else:
+        sq_ft_per_piece = Decimal("0")
+
+    sq_ft_pp = _round4(sq_ft_per_piece * qty_per_base * bases_per_top)
+
+    return {
+        "bd_ft_per_piece": bd_ft_per_piece,
+        "bd_ft_pp": bd_ft_pp,
+        "sq_ft_per_piece": sq_ft_per_piece,
+        "sq_ft_pp": sq_ft_pp,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 4. Panel Data
+# ──────────────────────────────────────────────────────────────────────
+
+def compute_panel_data(product: dict) -> dict:
+    """
+    Compute panel sqft and panel count for rate labor pipeline.
+
+    Panel data drives rate-based labor centers (LC101, LC102, LC103, LC106, LC109):
+        panel_sqft  — total surface area of all panels (top + components), in sq ft
+        panel_count — number of distinct panels (top + components per product config)
+
+    Top panel: produced by Hardwood, Live Edge, Laminate products.
+        panel_sqft += sq_ft_wl (W×L, NOT DIA-adjusted — matches verified 0737 numbers)
+        panel_count += 1
+
+    Component panels: from product_components of type 'plank' or 'leg'.
+        Added by Material Builder pipeline (Item 6). Not yet populated.
+        panel_sqft += component.sq_ft_pp
+        panel_count += component.qty_per_base × bases_per_top
+
+    Sheet reference: Rows 735–762 (panel data section).
+    LC103 Cutting uses panel_count as its metric (panels/hr), all others use panel_sqft (sqft/hr).
+    """
+    material_type = product.get("material_type", "")
+
+    # Top panel
+    top_panel_sqft = Decimal("0")
+    top_panel_count = 0
+
+    if material_type in ("Hardwood", "Live Edge", "Laminate"):
+        top_panel_sqft = _d(product.get("sq_ft_wl", 0))
+        top_panel_count = 1
+
+    # Component panels (Material Builder — Item 6, not yet built)
+    component_panel_sqft = Decimal("0")
+    component_panel_count = 0
+
+    bases_per_top = int(product.get("bases_per_top", 1) or 1)
+    for comp in product.get("components", []):
+        if comp.get("component_type") in ("plank", "leg"):
+            component_panel_sqft += _d(comp.get("sq_ft_pp", 0))
+            component_panel_count += int(comp.get("qty_per_base", 1) or 1) * bases_per_top
+
+    return {
+        "panel_sqft": _round4(top_panel_sqft + component_panel_sqft),
+        "panel_count": top_panel_count + component_panel_count,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 3. Unit Cost Block
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_cost_block(block: dict, product: dict) -> dict:
@@ -190,17 +309,19 @@ def compute_cost_block(block: dict, product: dict) -> dict:
     Compute a unit cost block: cost_per_unit × multiplier → PP → PT.
     
     multiplier_type determines what units_per_product resolves to:
-        'fixed'    → use the stored value as-is
-        'per_base' → bases_per_top
-        'per_sqft' → sq_ft
-        'per_bdft' → bd_ft
+        'per_unit'  → units_per_product (flat cost per table; canonical name)
+        'per_piece' → units_per_product (same math; UI labels it "pieces per table")
+        'fixed'     → units_per_product (legacy alias, kept for backward compat)
+        'per_base'  → bases_per_top
+        'per_sqft'  → sq_ft (DIA-adjusted area for material cost)
+        'per_bdft'  → bd_ft
     
     Sheet pattern (Unit Block):
         PP = CostPU × Multiplier
         PT = PP × Quantity
     """
     cost_per_unit = _d(block.get("cost_per_unit"))
-    multiplier_type = block.get("multiplier_type", "fixed")
+    multiplier_type = block.get("multiplier_type", "per_unit")
     quantity = _d(product.get("quantity", 1))
 
     # Resolve the multiplier
@@ -210,6 +331,11 @@ def compute_cost_block(block: dict, product: dict) -> dict:
         multiplier = _d(product.get("sq_ft", 0))
     elif multiplier_type == "per_bdft":
         multiplier = _d(product.get("bd_ft", 0))
+    elif multiplier_type in ("per_unit", "per_piece", "fixed"):
+        # per_unit: flat cost per table (units_per_product = how many per table)
+        # per_piece: same math, UI shows "pieces per table" label
+        # fixed: legacy name, kept for backward compatibility
+        multiplier = _d(block.get("units_per_product", 1))
     else:
         multiplier = _d(block.get("units_per_product", 1))
 
@@ -223,7 +349,7 @@ def compute_cost_block(block: dict, product: dict) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 3. Group Cost Pool
+# 4. Group Cost Pool
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_group_cost_pool(pool: dict, members: list[dict], products: dict[str, dict]) -> list[dict]:
@@ -259,7 +385,8 @@ def compute_group_cost_pool(pool: dict, members: list[dict], products: dict[str,
         qty = _d(prod.get("quantity", 1))
 
         if dist_type == "sqft":
-            metric = _d(prod.get("sq_ft", 0)) * qty
+            # Use W×L sqft (sq_ft_wl) matching sheet row 55 — NOT DIA-adjusted sq_ft
+            metric = _d(prod.get("sq_ft_wl", prod.get("sq_ft", 0))) * qty
         elif dist_type == "bdft":
             metric = _d(prod.get("bd_ft", 0)) * qty
         else:  # units
@@ -296,28 +423,43 @@ def compute_group_cost_pool(pool: dict, members: list[dict], products: dict[str,
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 4. Labor Blocks
+# 5. Labor Blocks
 # ──────────────────────────────────────────────────────────────────────
 
-def compute_labor_block(block: dict, product: dict, all_products_metric_total: Optional[Decimal] = None) -> dict:
+def compute_labor_block(
+    block: dict,
+    product: dict,
+    all_products_metric_total: Optional[Decimal] = None,
+    all_products_qty_total: Optional[Decimal] = None,
+) -> dict:
     """
     Compute a labor block's hours.
-    
+
     block_type determines the calculation:
-    
+
     'unit': Direct hours input.
         hours_pp = hours_per_unit
         hours_pt = hours_pp × quantity
-        
-    'rate': Proportional hours from a rate (sqft/hr, panels/hr).
-        total_hours = total_metric / rate_value
-        hours_pp = (product_metric / total_metric) × total_hours / quantity
-        
-        NOTE: Rate blocks need total metric across ALL products to distribute
-        proportionally (same as Tier 1 LCs: LC101, LC102). Pass 
-        all_products_metric_total for cross-product distribution.
-        For single-product rate blocks, it simplifies to metric / rate.
-        
+
+    'rate': Proportional hours from a rate.
+        Two rate_type modes:
+
+        rate_type='metric' (default — sqft/hr, panels/hr, bdft/hr):
+            total_hours = total_metric / rate_value
+            hours_pp = product_metric / rate_value  (simplifies to same result cross-product)
+
+        rate_type='units' (tables/hr — LC104 CNC pattern):
+            total_hours = total_qty / rate_value
+            hours_pp = (product_metric / total_metric) × total_hours / qty
+            Requires all_products_metric_total AND all_products_qty_total.
+
+    metric_source options:
+        'panel_sqft'  — sq_ft_wl of top + component sqft (W×L always)
+        'panel_count' — number of distinct panels (LC103 Cutting)
+        'top_sqft'    — sq_ft_wl (W×L, not DIA-adjusted; standard for rate labor)
+        'sq_ft'       — DIA-adjusted sqft (use for LC104 when DIA products participate)
+        'bd_ft'       — board footage
+
     'group': Handled by group_labor_pools (same pattern as group cost pools)
     """
     block_type = block.get("block_type", "unit")
@@ -328,38 +470,63 @@ def compute_labor_block(block: dict, product: dict, all_products_metric_total: O
         return {"hours_pp": Decimal("0"), "hours_pt": Decimal("0")}
 
     if block_type == "unit":
-        hours_pu = _d(block.get("hours_per_unit", 0))
-        hours_pp = hours_pu
-        hours_pt = _round4(hours_pp * quantity)
-        return {"hours_pp": _round4(hours_pp), "hours_pt": hours_pt}
+        hours_pp = _d(block.get("hours_per_unit", 0))
+        hours_pt = hours_pp * quantity
+        return {"hours_pp": hours_pp, "hours_pt": hours_pt}
 
     elif block_type == "rate":
         rate_value = _d(block.get("rate_value", 0))
         metric_source = block.get("metric_source", "top_sqft")
+        rate_type = block.get("rate_type", "metric")
 
-        # Resolve this product's metric
+        # Resolve this product's metric.
         if metric_source == "panel_sqft":
-            product_metric = _d(product.get("panel_sqft", product.get("sq_ft", 0)))
+            # W×L-based panel area (includes components). Falls back to sq_ft_wl.
+            product_metric = _d(product.get("panel_sqft", product.get("sq_ft_wl", product.get("sq_ft", 0))))
+        elif metric_source == "panel_count":
+            # LC103 Cutting: panels/hr, not sqft.
+            product_metric = _d(product.get("panel_count", 0))
+        elif metric_source == "sq_ft":
+            # DIA-adjusted area — used by LC104 which distributes by actual surface area.
+            # For non-DIA products sq_ft == sq_ft_wl.
+            product_metric = _d(product.get("sq_ft", product.get("sq_ft_wl", 0)))
         elif metric_source == "top_sqft":
-            product_metric = _d(product.get("sq_ft", 0))
+            # W×L always (not DIA-adjusted). Standard for most rate labor centers.
+            product_metric = _d(product.get("sq_ft_wl", product.get("sq_ft", 0)))
         elif metric_source == "bd_ft":
             product_metric = _d(product.get("bd_ft", 0))
         else:
-            product_metric = _d(product.get("sq_ft", 0))
+            product_metric = _d(product.get("sq_ft_wl", product.get("sq_ft", 0)))
 
-        if rate_value == 0 or product_metric == 0:
+        if rate_value == 0:
             return {"hours_pp": Decimal("0"), "hours_pt": Decimal("0")}
 
-        # Single-product simplified: hours = metric / rate
-        # Multi-product proportional: hours = (product_metric / total_metric) × (total_metric / rate) / qty
-        if all_products_metric_total and all_products_metric_total > 0:
-            total_hours = all_products_metric_total / rate_value
-            product_metric_pt = product_metric * quantity
-            hours_pp = _round4((product_metric_pt / all_products_metric_total) * total_hours / quantity)
+        if rate_type == "units":
+            # LC104 pattern: rate is in tables/hr (units), not metric/hr.
+            # total_hours = total_qty_in_pool / rate
+            # hours_pp = (product_metric / total_metric) × total_hours / qty
+            if (all_products_metric_total and all_products_metric_total > 0
+                    and all_products_qty_total and all_products_qty_total > 0
+                    and product_metric > 0):
+                total_hours = all_products_qty_total / rate_value
+                product_metric_pt = product_metric * quantity
+                hours_pp = (product_metric_pt / all_products_metric_total) * total_hours / quantity
+            else:
+                # Cannot compute without cross-product totals; return 0 as safe default.
+                hours_pp = Decimal("0")
         else:
-            hours_pp = _round4(product_metric / rate_value)
+            # rate_type='metric' (default): total_hours = total_metric / rate
+            # Cross-product proportional simplifies to product_metric / rate.
+            if product_metric == 0:
+                return {"hours_pp": Decimal("0"), "hours_pt": Decimal("0")}
+            if all_products_metric_total and all_products_metric_total > 0:
+                total_hours = all_products_metric_total / rate_value
+                product_metric_pt = product_metric * quantity
+                hours_pp = (product_metric_pt / all_products_metric_total) * total_hours / quantity
+            else:
+                hours_pp = product_metric / rate_value
 
-        hours_pt = _round4(hours_pp * quantity)
+        hours_pt = hours_pp * quantity
         return {"hours_pp": hours_pp, "hours_pt": hours_pt}
 
     # Group type handled by group_labor_pools
@@ -387,7 +554,14 @@ def compute_group_labor_pool(pool: dict, members: list[dict], products: dict[str
         qty = _d(prod.get("quantity", 1))
 
         if dist_type == "sqft":
-            metric = _d(prod.get("sq_ft", 0)) * qty
+            # Currently uses sq_ft_wl (W×L) matching the cost pool behavior.
+            # KNOWN ISSUE: some labor pools may use DIA-adjusted sq_ft instead.
+            # Farmhouse Kitchen 0737 LC100 produces 0.0397h for T1 only when T2
+            # contributes 19.635 sqft-units (DIA-adjusted), not 25 (W×L = sq_ft_wl).
+            # This needs a per-pool flag (e.g. dist_sqft_source: "sq_ft" | "sq_ft_wl")
+            # to be resolved when the UI exposes pool distribution configuration.
+            # TODO: add dist_sqft_source to group_labor_pools (and group_cost_pools for consistency).
+            metric = _d(prod.get("sq_ft_wl", prod.get("sq_ft", 0))) * qty
         elif dist_type == "bdft":
             metric = _d(prod.get("bd_ft", 0)) * qty
         else:
@@ -407,8 +581,8 @@ def compute_group_labor_pool(pool: dict, members: list[dict], products: dict[str
     for r in results:
         qty = r.pop("_qty")
         if qty > 0:
-            r["hours_pp"] = _round4(r["metric_value"] / qty * rate)
-            r["hours_pt"] = _round4(r["hours_pp"] * qty)
+            r["hours_pp"] = r["metric_value"] / qty * rate
+            r["hours_pt"] = r["hours_pp"] * qty
         else:
             r["hours_pp"] = Decimal("0")
             r["hours_pt"] = Decimal("0")
@@ -417,7 +591,7 @@ def compute_group_labor_pool(pool: dict, members: list[dict], products: dict[str
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 5. Product Pricing Assembly
+# 6. Product Pricing Assembly
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_product_pricing(
@@ -540,7 +714,7 @@ def compute_product_pricing(
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 6. Tag Summary
+# 7. Tag Summary
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_tag_summary(
@@ -588,7 +762,7 @@ def compute_tag_summary(
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 7. Option & Quote Totals
+# 8. Option & Quote Totals
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_option_totals(product_results: list[dict]) -> dict:
@@ -612,7 +786,7 @@ def compute_option_totals(product_results: list[dict]) -> dict:
     }
 
 
-def compute_quote_totals(option_results: list[dict]) -> dict:
+def compute_quote_totals(option_results: list[dict], shipping: Decimal = Decimal("0")) -> dict:
     """
     Roll up option totals to quote level.
     For single-option quotes this is just a pass-through.
@@ -624,16 +798,18 @@ def compute_quote_totals(option_results: list[dict]) -> dict:
     total_cost = sum(_d(o.get("total_cost", 0)) for o in option_results)
     total_price = sum(_d(o.get("total_price", 0)) for o in option_results)
     total_hours = sum(_d(o.get("total_hours", 0)) for o in option_results)
+    grand_total = _round2(total_price + _d(shipping))
 
     return {
         "total_cost": _round2(total_cost),
         "total_price": _round2(total_price),
         "total_hours": _round4(total_hours),
+        "grand_total": grand_total,
     }
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 8. Full Quote Computation (Orchestrator)
+# 9. Full Quote Computation (Orchestrator)
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_quote(quote_data: dict) -> dict:
@@ -687,6 +863,18 @@ def compute_quote(quote_data: dict) -> dict:
         product.update(dims)
         product["dimension_string"] = compute_dimension_string(product)
 
+    # ── Phase 1.25: Compute component dimensions (Material Builder) ──
+    # Must run after product dimensions (needs bases_per_top) and before panel data.
+    for pid, product in all_products.items():
+        for comp in product.get("components", []):
+            comp.update(compute_component(comp, product))
+
+    # ── Phase 1.5: Compute panel data ──
+    # Must run after components (panel_sqft includes component sqft) and before labor.
+    for pid, product in all_products.items():
+        panel_data = compute_panel_data(product)
+        product.update(panel_data)
+
     # ── Phase 2: Compute unit cost blocks ──
     for pid, product in all_products.items():
         for block in product.get("cost_blocks", []):
@@ -716,10 +904,43 @@ def compute_quote(quote_data: dict) -> dict:
         pool["members"] = computed_members
 
     # ── Phase 4: Compute labor blocks ──
+    # For rate_type='units' blocks (e.g. LC104), we need cross-product totals:
+    # total_qty and total_metric across all products carrying that block type.
+    # Key = (labor_center, rate_value, metric_source) — identifies a shared rate pool.
+    _units_metric_totals: dict[tuple, Decimal] = {}
+    _units_qty_totals: dict[tuple, Decimal] = {}
+
+    for pid, product in all_products.items():
+        for block in product.get("labor_blocks", []):
+            if block.get("block_type") == "rate" and block.get("rate_type") == "units":
+                key = (block.get("labor_center"), block.get("rate_value"), block.get("metric_source"))
+                qty = _d(product.get("quantity", 1))
+                ms = block.get("metric_source", "top_sqft")
+                if ms == "sq_ft":
+                    metric = _d(product.get("sq_ft", product.get("sq_ft_wl", 0)))
+                elif ms == "panel_sqft":
+                    metric = _d(product.get("panel_sqft", product.get("sq_ft_wl", 0)))
+                elif ms == "panel_count":
+                    metric = _d(product.get("panel_count", 0))
+                elif ms == "bd_ft":
+                    metric = _d(product.get("bd_ft", 0))
+                else:
+                    metric = _d(product.get("sq_ft_wl", product.get("sq_ft", 0)))
+                _units_metric_totals[key] = _units_metric_totals.get(key, Decimal("0")) + metric * qty
+                _units_qty_totals[key] = _units_qty_totals.get(key, Decimal("0")) + qty
+
     for pid, product in all_products.items():
         for block in product.get("labor_blocks", []):
             if block.get("block_type") != "group":
-                result = compute_labor_block(block, product)
+                if block.get("rate_type") == "units":
+                    key = (block.get("labor_center"), block.get("rate_value"), block.get("metric_source"))
+                    result = compute_labor_block(
+                        block, product,
+                        all_products_metric_total=_units_metric_totals.get(key),
+                        all_products_qty_total=_units_qty_totals.get(key),
+                    )
+                else:
+                    result = compute_labor_block(block, product)
                 block.update(result)
 
     # ── Phase 5: Compute group labor pools ──
@@ -777,7 +998,8 @@ def compute_quote(quote_data: dict) -> dict:
         option_results.append(opt_totals)
 
     # ── Phase 7: Quote totals ──
-    quote_totals = compute_quote_totals(option_results)
+    shipping = _d(quote.get("shipping", 0))
+    quote_totals = compute_quote_totals(option_results, shipping)
     quote.update(quote_totals)
 
     return quote_data

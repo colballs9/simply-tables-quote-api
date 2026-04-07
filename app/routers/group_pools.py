@@ -201,3 +201,43 @@ async def delete_group_labor_pool(pool_id: uuid.UUID, db: AsyncSession = Depends
 
     result = await recalculate_quote(db, quote_id)
     return QuoteRead.model_validate(result)
+
+
+@router.post("/group-labor-pools/{pool_id}/members/{product_id}", response_model=QuoteRead)
+async def add_labor_pool_member(
+    pool_id: uuid.UUID,
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    pool = await db.get(GroupLaborPool, pool_id)
+    if not pool:
+        raise HTTPException(404, "Pool not found")
+
+    member = GroupLaborPoolMember(pool_id=pool_id, product_id=product_id)
+    db.add(member)
+    await db.flush()
+
+    result = await recalculate_quote(db, pool.quote_id)
+    return QuoteRead.model_validate(result)
+
+
+@router.delete("/group-labor-pools/{pool_id}/members/{product_id}", response_model=QuoteRead)
+async def remove_labor_pool_member(
+    pool_id: uuid.UUID,
+    product_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    pool = await db.get(GroupLaborPool, pool_id)
+    if not pool:
+        raise HTTPException(404, "Pool not found")
+
+    for member in pool.members:
+        if member.product_id == product_id:
+            await db.delete(member)
+            break
+    else:
+        raise HTTPException(404, "Member not found in pool")
+
+    await db.flush()
+    result = await recalculate_quote(db, pool.quote_id)
+    return QuoteRead.model_validate(result)

@@ -35,6 +35,51 @@ class TagCreate(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Product Components (Material Builder)
+# ──────────────────────────────────────────────────────────────────────
+
+class ComponentCreate(BaseModel):
+    sort_order: int = 0
+    component_type: str          # plank, leg, apron_l, apron_w, metal_part, other
+    description: Optional[str] = None
+    width: Optional[float] = None
+    length: Optional[float] = None
+    thickness: Optional[float] = None   # raw lumber inches
+    qty_per_base: int = 1
+    material: Optional[str] = None      # species name or material type
+
+
+class ComponentUpdate(BaseModel):
+    sort_order: Optional[int] = None
+    component_type: Optional[str] = None
+    description: Optional[str] = None
+    width: Optional[float] = None
+    length: Optional[float] = None
+    thickness: Optional[float] = None
+    qty_per_base: Optional[int] = None
+    material: Optional[str] = None
+
+
+class ComponentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    product_id: uuid.UUID
+    sort_order: int
+    component_type: str
+    description: Optional[str] = None
+    width: Optional[float] = None
+    length: Optional[float] = None
+    thickness: Optional[float] = None
+    qty_per_base: int
+    material: Optional[str] = None
+    # Computed
+    bd_ft_per_piece: Optional[float] = None
+    bd_ft_pp: Optional[float] = None
+    sq_ft_per_piece: Optional[float] = None
+    sq_ft_pp: Optional[float] = None
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Cost Blocks
 # ──────────────────────────────────────────────────────────────────────
 
@@ -45,7 +90,7 @@ class CostBlockCreate(BaseModel):
     description: Optional[str] = None
     cost_per_unit: Optional[float] = None
     units_per_product: float = 1
-    multiplier_type: str = "fixed"
+    multiplier_type: str = "per_unit"
 
 
 class CostBlockUpdate(BaseModel):
@@ -69,6 +114,7 @@ class CostBlockRead(BaseModel):
     cost_per_unit: Optional[float] = None
     units_per_product: float
     multiplier_type: str
+    is_builtin: bool = False
     cost_pp: Optional[float] = None
     cost_pt: Optional[float] = None
 
@@ -85,6 +131,7 @@ class LaborBlockCreate(BaseModel):
     description: Optional[str] = None
     rate_value: Optional[float] = None
     metric_source: Optional[str] = None
+    rate_type: Optional[str] = None  # metric (default) | units (LC104 pattern)
     is_active: bool = True
     hours_per_unit: Optional[float] = None
 
@@ -97,6 +144,7 @@ class LaborBlockUpdate(BaseModel):
     description: Optional[str] = None
     rate_value: Optional[float] = None
     metric_source: Optional[str] = None
+    rate_type: Optional[str] = None
     is_active: Optional[bool] = None
     hours_per_unit: Optional[float] = None
 
@@ -112,7 +160,9 @@ class LaborBlockRead(BaseModel):
     description: Optional[str] = None
     rate_value: Optional[float] = None
     metric_source: Optional[str] = None
+    rate_type: str = "metric"
     is_active: bool
+    is_builtin: bool = False
     hours_per_unit: Optional[float] = None
     hours_pp: Optional[float] = None
     hours_pt: Optional[float] = None
@@ -312,11 +362,23 @@ class ProductRead(BaseModel):
     bases_per_top: int
     hourly_rate: float
     final_adjustment_rate: float
+    # Margin rates (returned so UI can display/edit current values)
+    hardwood_margin_rate: float
+    stone_margin_rate: float
+    stock_base_margin_rate: float
+    stock_base_ship_margin_rate: float
+    powder_coat_margin_rate: float
+    custom_base_margin_rate: float
+    unit_cost_margin_rate: float
+    group_cost_margin_rate: float
+    misc_margin_rate: float
+    consumables_margin_rate: float
     # Computed dimensions
     sq_ft: Optional[float] = None
     bd_ft: Optional[float] = None
     # Computed pricing
     total_material_cost: Optional[float] = None
+    total_material_margin: Optional[float] = None
     total_material_price: Optional[float] = None
     total_hours_pp: Optional[float] = None
     hours_price: Optional[float] = None
@@ -325,8 +387,55 @@ class ProductRead(BaseModel):
     sale_price_pp: Optional[float] = None
     sale_price_total: Optional[float] = None
     # Nested
+    components: list[ComponentRead] = []
     cost_blocks: list[CostBlockRead] = []
     labor_blocks: list[LaborBlockRead] = []
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Job Summary (side panel aggregation)
+# ──────────────────────────────────────────────────────────────────────
+
+class TagLineSummary(BaseModel):
+    """Cost and hours totals for a single tag across the whole job."""
+    cost_pt: float = 0.0
+    hours_pt: float = 0.0
+
+
+class QuoteJobSummary(BaseModel):
+    """
+    Aggregated view of the quote for the side panel.
+    Sums cost_pt and hours_pt from all blocks across all products.
+    """
+    quote_id: uuid.UUID
+
+    # Cost totals by category (flat dict, category key → total cost_pt)
+    cost_by_category: dict[str, float] = {}
+
+    # Three visual cost groups (derived from cost_by_category)
+    material_cost_total: float = 0.0    # species, stone, hardwood_base
+    base_cost_total: float = 0.0        # stock_base, SB shipping, powder coat, custom base
+    other_cost_total: float = 0.0       # unit_cost, misc, consumables, group_cost, etc.
+
+    # Tag aggregations (tag_name → totals)
+    cost_by_tag: dict[str, TagLineSummary] = {}
+
+    # Labor by center (labor_center → total hours_pt across job)
+    hours_by_labor_center: dict[str, float] = {}
+
+    # Quote-level totals (already stored on the quote after recalc)
+    total_cost: Optional[float] = None      # raw material cost across job
+    total_margin: float = 0.0              # total margin dollars
+    total_material_price: float = 0.0      # cost + margin
+    total_hours: Optional[float] = None
+    hours_price: float = 0.0
+    quote_total: Optional[float] = None    # sale price total (ex shipping)
+    shipping: float = 0.0
+    grand_total: Optional[float] = None
+
+    # Op metrics
+    op_revenue: Optional[float] = None     # quote_total - total_cost
+    job_dollar_per_hr: Optional[float] = None   # op_revenue / total_hours
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -365,6 +474,7 @@ class QuoteCreate(BaseModel):
     rep_rate: float = 0.08
     status: str = "draft"
     drive_folder_id: Optional[str] = None
+    shipping: float = 0.0
 
 
 class QuoteUpdate(BaseModel):
@@ -373,6 +483,7 @@ class QuoteUpdate(BaseModel):
     rep_rate: Optional[float] = None
     status: Optional[str] = None
     drive_folder_id: Optional[str] = None
+    shipping: Optional[float] = None
 
 
 class QuoteSummary(BaseModel):
@@ -384,7 +495,9 @@ class QuoteSummary(BaseModel):
     quote_number: str
     status: str
     has_rep: bool
+    shipping: float = 0.0
     total_price: Optional[float] = None
+    grand_total: Optional[float] = None
     total_hours: Optional[float] = None
     created_at: datetime
     updated_at: datetime
@@ -402,14 +515,54 @@ class QuoteRead(BaseModel):
     has_rep: bool
     rep_rate: float
     status: str
+    shipping: float = 0.0
     total_cost: Optional[float] = None
     total_price: Optional[float] = None
     total_hours: Optional[float] = None
+    grand_total: Optional[float] = None
     created_at: datetime
     updated_at: datetime
     options: list[QuoteOptionRead] = []
     group_cost_pools: list[GroupCostPoolRead] = []
     group_labor_pools: list[GroupLaborPoolRead] = []
+    stone_assignments: list[StoneAssignmentRead] = []
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Species Assignments
+# ──────────────────────────────────────────────────────────────────────
+
+class SpeciesAssignmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    quote_id: uuid.UUID
+    species_name: str
+    quarter_code: str
+    species_key: str
+    price_per_bdft: Optional[float] = None
+    total_bdft: Optional[float] = None
+    total_cost: Optional[float] = None
+
+
+class SpeciesAssignmentUpdate(BaseModel):
+    price_per_bdft: float
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Stone Assignments
+# ──────────────────────────────────────────────────────────────────────
+
+class StoneAssignmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    quote_id: uuid.UUID
+    stone_key: str
+    total_sqft: Optional[float] = None
+    total_cost: Optional[float] = None
+
+
+class StoneAssignmentUpdate(BaseModel):
+    total_cost: float
 
 
 # ──────────────────────────────────────────────────────────────────────

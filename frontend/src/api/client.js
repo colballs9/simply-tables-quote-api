@@ -52,6 +52,7 @@ export const quotes = {
   update: (id, data) => request(`/quotes/${id}`, { method: 'PATCH', body: data }),
   delete: (id) => request(`/quotes/${id}`, { method: 'DELETE' }),
   recalculate: (id) => request(`/quotes/${id}/recalculate`, { method: 'POST' }),
+  summary: (id) => request(`/quotes/${id}/summary`),
 };
 
 // ── Products ──
@@ -92,6 +93,8 @@ export const groupLaborPools = {
   create: (quoteId, data) => request(`/quotes/${quoteId}/group-labor-pools`, { method: 'POST', body: data }),
   update: (poolId, data) => request(`/group-labor-pools/${poolId}`, { method: 'PATCH', body: data }),
   delete: (poolId) => request(`/group-labor-pools/${poolId}`, { method: 'DELETE' }),
+  addMember: (poolId, productId) => request(`/group-labor-pools/${poolId}/members/${productId}`, { method: 'POST' }),
+  removeMember: (poolId, productId) => request(`/group-labor-pools/${poolId}/members/${productId}`, { method: 'DELETE' }),
 };
 
 // ── Catalog & Context ──

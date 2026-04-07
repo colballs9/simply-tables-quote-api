@@ -76,10 +76,16 @@ class Quote(Base):
     drive_folder_id: Mapped[str | None] = mapped_column(String)
     sheet_id: Mapped[str | None] = mapped_column(String)
 
+    # Shipping / tax (quote-level, outside per-product pricing)
+    shipping: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    sales_tax: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    budget_buffer_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+
     # Computed totals
     total_cost: Mapped[float | None] = mapped_column(Numeric(12, 2))
     total_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
     total_hours: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    grand_total: Mapped[float | None] = mapped_column(Numeric(12, 2))  # total_price + shipping
 
     # Metadata
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
@@ -92,6 +98,8 @@ class Quote(Base):
                                                          order_by="QuoteOption.sort_order")
     group_cost_pools: Mapped[list["GroupCostPool"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
     group_labor_pools: Mapped[list["GroupLaborPool"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
+    species_assignments: Mapped[list["SpeciesAssignment"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
+    stone_assignments: Mapped[list["StoneAssignment"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("deal_id", "quote_set", "version"),
@@ -179,6 +187,10 @@ class Product(Base):
     bd_ft: Mapped[float | None] = mapped_column(Numeric(10, 4))
     bases_per_top: Mapped[int] = mapped_column(Integer, default=1)
 
+    # Panel data (computed by engine, used for rate labor pipeline)
+    panel_sqft: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    panel_count: Mapped[int | None] = mapped_column(Integer)
+
     # Margin rates
     hardwood_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
     stone_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
@@ -215,6 +227,8 @@ class Product(Base):
                                                            order_by="CostBlock.sort_order")
     labor_blocks: Mapped[list["LaborBlock"]] = relationship(back_populates="product", cascade="all, delete-orphan",
                                                              order_by="LaborBlock.sort_order")
+    components: Mapped[list["ProductComponent"]] = relationship(back_populates="product", cascade="all, delete-orphan",
+                                                                order_by="ProductComponent.sort_order")
 
     __table_args__ = (
         Index("idx_products_option", "option_id"),
@@ -239,7 +253,8 @@ class CostBlock(Base):
     description: Mapped[str | None] = mapped_column(Text)
     cost_per_unit: Mapped[float | None] = mapped_column(Numeric(12, 4))
     units_per_product: Mapped[float] = mapped_column(Numeric(10, 4), default=1)
-    multiplier_type: Mapped[str] = mapped_column(String, default="fixed")
+    multiplier_type: Mapped[str] = mapped_column(String, default="per_unit")
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Computed
     cost_pp: Mapped[float | None] = mapped_column(Numeric(12, 4))
@@ -321,9 +336,12 @@ class LaborBlock(Base):
 
     description: Mapped[str | None] = mapped_column(Text)
 
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+
     # Rate block
     rate_value: Mapped[float | None] = mapped_column(Numeric(10, 4))
     metric_source: Mapped[str | None] = mapped_column(String)
+    rate_type: Mapped[str] = mapped_column(String, default="metric")  # metric | units
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Unit block
@@ -510,3 +528,98 @@ class MaterialContext(Base):
     edge_options: Mapped[list | None] = mapped_column(JSONB)
     stain_options: Mapped[list | None] = mapped_column(JSONB)
     sheen_options: Mapped[list | None] = mapped_column(JSONB)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Product Components (Material Builder)
+# ──────────────────────────────────────────────────────────────────────
+
+class ProductComponent(Base):
+    __tablename__ = "product_components"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"))
+
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    component_type: Mapped[str] = mapped_column(String, nullable=False)  # plank, leg, apron_l, apron_w, metal_part, other
+    description: Mapped[str | None] = mapped_column(Text)
+
+    # Dimensions
+    width: Mapped[float | None] = mapped_column(Numeric(8, 2))
+    length: Mapped[float | None] = mapped_column(Numeric(8, 2))
+    thickness: Mapped[float | None] = mapped_column(Numeric(8, 4))  # raw lumber inches
+    qty_per_base: Mapped[int] = mapped_column(Integer, default=1)
+    material: Mapped[str | None] = mapped_column(String)  # species name or material type
+
+    # Computed by engine
+    bd_ft_per_piece: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    bd_ft_pp: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    sq_ft_per_piece: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    sq_ft_pp: Mapped[float | None] = mapped_column(Numeric(10, 4))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    product: Mapped["Product"] = relationship(back_populates="components")
+
+    __table_args__ = (
+        Index("idx_components_product", "product_id"),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Species Assignments
+# ──────────────────────────────────────────────────────────────────────
+
+class SpeciesAssignment(Base):
+    __tablename__ = "species_assignments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quote_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quotes.id", ondelete="CASCADE"))
+
+    species_name: Mapped[str] = mapped_column(String, nullable=False)   # 'Walnut', 'Ash'
+    quarter_code: Mapped[str] = mapped_column(String, nullable=False)   # '8/4', '6/4'
+    species_key: Mapped[str] = mapped_column(String, nullable=False)    # 'Walnut 8/4'
+    price_per_bdft: Mapped[float | None] = mapped_column(Numeric(10, 4))
+
+    # Computed
+    total_bdft: Mapped[float | None] = mapped_column(Numeric(12, 4))
+    total_cost: Mapped[float | None] = mapped_column(Numeric(12, 2))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    quote: Mapped["Quote"] = relationship(back_populates="species_assignments")
+
+    __table_args__ = (
+        UniqueConstraint("quote_id", "species_key", name="uq_species_assignment"),
+        Index("idx_species_quote", "quote_id"),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Stone Assignments
+# ──────────────────────────────────────────────────────────────────────
+
+class StoneAssignment(Base):
+    __tablename__ = "stone_assignments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quote_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quotes.id", ondelete="CASCADE"))
+
+    stone_key: Mapped[str] = mapped_column(String, nullable=False)   # 'Quartz', 'Terrazzo', etc.
+
+    # Computed
+    total_sqft: Mapped[float | None] = mapped_column(Numeric(12, 4))
+    # User input
+    total_cost: Mapped[float | None] = mapped_column(Numeric(12, 2))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    quote: Mapped["Quote"] = relationship(back_populates="stone_assignments")
+
+    __table_args__ = (
+        UniqueConstraint("quote_id", "stone_key", name="uq_stone_assignment"),
+        Index("idx_stone_quote", "quote_id"),
+    )

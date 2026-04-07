@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .database import init_db
-from .routers import quotes, products, cost_blocks, labor_blocks, group_pools, catalog
+from .routers import quotes, products, cost_blocks, labor_blocks, group_pools, catalog, debug, species, components, stone, summary
 
 
 @asynccontextmanager
@@ -58,6 +58,11 @@ app.include_router(cost_blocks.router, prefix="/api")
 app.include_router(labor_blocks.router, prefix="/api")
 app.include_router(group_pools.router, prefix="/api")
 app.include_router(catalog.router, prefix="/api")
+app.include_router(debug.router, prefix="/api")
+app.include_router(species.router, prefix="/api")
+app.include_router(components.router, prefix="/api")
+app.include_router(stone.router, prefix="/api")
+app.include_router(summary.router, prefix="/api")
 
 
 @app.get("/health")

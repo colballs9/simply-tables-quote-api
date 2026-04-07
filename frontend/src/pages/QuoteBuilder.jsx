@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react'
 import { quotes, products } from '../api/client'
 import ProductCard from '../components/ProductCard'
+import SidePanel from '../components/SidePanel'
 
 function formatPrice(val) {
   if (!val && val !== 0) return '—'
@@ -146,18 +147,6 @@ export default function QuoteBuilder() {
     return String(a.id || '').localeCompare(String(b.id || ''))
   })
 
-  const optionTotalPrice = activeOption?.total_price ?? null
-  const optionTotalHours = activeOption?.total_hours ?? null
-  const optionTotalCost = activeOption?.total_cost ?? null
-
-  const rowLabels = [
-    'Product',
-    'Specs',
-    'Cost Blocks',
-    'Labor Blocks',
-    'Pricing Summary'
-  ]
-
   return (
     <div className="fade-in">
       {/* Header */}
@@ -278,63 +267,12 @@ export default function QuoteBuilder() {
       </div>
 
       <div className="quote-canvas-shell">
-        <aside className="quote-canvas-left">
-          <div className="canvas-panel">
-            <div className="canvas-panel-title">Option View</div>
-            {options.length > 0 ? (
-              <div className="option-tabs">
-                {options.map((opt, idx) => (
-                  <button
-                    key={opt.id}
-                    className={`option-tab ${activeOption?.id === opt.id ? 'active' : ''}`}
-                    onClick={() => setSelectedOptionId(opt.id)}
-                  >
-                    {opt.name || `Option ${idx + 1}`}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="muted-copy">No options available</p>
-            )}
-          </div>
-
-          <div className="canvas-panel">
-            <div className="canvas-panel-title">Totals</div>
-            <div className="totals-grid">
-              <div>
-                <div className="totals-label">Option Price</div>
-                <div className="totals-value">{formatPrice(optionTotalPrice)}</div>
-              </div>
-              <div>
-                <div className="totals-label">Option Hours</div>
-                <div className="totals-value hours">{optionTotalHours ? `${Number(optionTotalHours).toFixed(1)}h` : '—'}</div>
-              </div>
-              <div>
-                <div className="totals-label">Quote Price</div>
-                <div className="totals-value final">{formatPrice(quote.total_price)}</div>
-              </div>
-              <div>
-                <div className="totals-label">Quote Hours</div>
-                <div className="totals-value hours">{quote.total_hours ? `${Number(quote.total_hours).toFixed(1)}h` : '—'}</div>
-              </div>
-              <div>
-                <div className="totals-label">Quote Cost</div>
-                <div className="totals-value cost">{formatPrice(quote.total_cost)}</div>
-              </div>
-              <div>
-                <div className="totals-label">Option Cost</div>
-                <div className="totals-value cost">{formatPrice(optionTotalCost)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="canvas-panel">
-            <div className="canvas-panel-title">Rows</div>
-            <ul className="row-label-list">
-              {rowLabels.map(label => <li key={label}>{label}</li>)}
-            </ul>
-          </div>
-        </aside>
+        <SidePanel
+          quote={quote}
+          activeOption={activeOption}
+          onOptionSelect={setSelectedOptionId}
+          onQuoteUpdate={refreshQuote}
+        />
 
         <section className="quote-canvas-right">
           {!activeOption && (
