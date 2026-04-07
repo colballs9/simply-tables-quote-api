@@ -600,7 +600,6 @@ async def manage_rate_labor_pipeline(db: AsyncSession, quote: Quote) -> None:
                     product_id=product.id,
                 )
                 db.add(m)
-                block.members.append(m)
 
     await db.flush()
 
