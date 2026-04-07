@@ -151,11 +151,87 @@ PRICING
 
 ## Phase 2F — Cleanup & Deploy
 
-- Update `DEPLOYMENT_NOTES.md` with migration 006 run instructions
-- Remove `app/routers/cost_blocks.py`, `labor_blocks.py`, `group_pools.py`
-- Commit + push
-- Run `alembic upgrade head` on Cloud SQL via proxy
-- Smoke test: create quote → add products → blocks auto-create → edit rate → verify recalc
+### Phase 2 Deploy Runbook
+
+#### Prerequisites
+- `gcloud` authenticated to project `onyx-antler-483815-i1`
+- Cloud SQL Proxy installed (`gcloud components install cloud-sql-proxy`)
+- Postgres password for Cloud SQL instance `simply-tables-db`
+
+#### 1. Start Cloud SQL Proxy
+Run in a separate terminal:
+
+```bash
+cloud-sql-proxy onyx-antler-483815-i1:us-central1:simply-tables-db
+```
+
+#### 2. Run Migration 006
+
+```bash
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/simply_tables \
+  alembic upgrade head
+```
+
+Migration 006:
+- Creates `system_defaults` table and seeds the global defaults row
+- Adds default hourly/margin columns to `quotes`
+- Creates `quote_blocks` and `quote_block_members`
+- Drops old tables:
+  - `cost_blocks`
+  - `labor_blocks`
+  - `group_cost_pools`
+  - `group_cost_pool_members`
+  - `group_labor_pools`
+  - `group_labor_pool_members`
+
+#### 3. Verify Migration State
+
+```bash
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/simply_tables \
+  alembic current
+```
+
+Expected result includes:
+
+```text
+006_quote_block_architecture (head)
+```
+
+#### 4. Deploy to Cloud Run
+
+```bash
+gcloud run deploy simply-tables-quote-api \
+  --source . \
+  --region us-central1 \
+  --project onyx-antler-483815-i1 \
+  --allow-unauthenticated
+```
+
+#### 5. Verify Deployment
+
+```bash
+base="https://simply-tables-quote-api-gxdcbpwqka-uc.a.run.app"
+curl -i "$base/health"
+curl -i "$base/api/quotes"
+curl -i "$base/api/defaults"
+```
+
+Healthy responses should be HTTP 200 for all three endpoints.
+
+#### 6. UI Smoke Test
+- Open the app in browser
+- Create a new quote
+- Add 2-3 products (species + rate labor blocks should auto-create)
+- Edit a block rate value and confirm pricing recalculates
+- Click a product header and verify the rate/margin editor opens in side panel
+- Add a manual cost block via **Add Cost Block**
+
+#### 7. Post-Deploy Check (Recommended)
+- Confirm new quotes inherit expected values from `system_defaults`
+- Confirm older quotes still open and recalculate without errors
+- Confirm no 500s in Cloud Run logs during smoke test flows
+
+Replace `YOUR_PASSWORD` in commands above with the actual Cloud SQL password.
 
 ---
 

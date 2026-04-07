@@ -1,6 +1,6 @@
 # Build Plan and Handoff Guardrails
 
-Last updated: 2026-04-06
+Last updated: 2026-04-07
 Scope: simply-tables-quote-api
 
 ## Purpose
@@ -10,6 +10,7 @@ This document is the safe execution plan for future chats. Follow this order and
 ## Current Known-Good Baseline
 
 - Service: simply-tables-quote-api (Cloud Run, us-central1)
+- Live URL: https://simply-tables-quote-api-442186711676.us-central1.run.app
 - API prefix: /api
 - Frontend served by FastAPI from frontend/dist at /
 - Required DB driver: postgresql+asyncpg
@@ -78,7 +79,7 @@ npm run build
 Live health checks:
 
 ```bash
-base="https://simply-tables-quote-api-gxdcbpwqka-uc.a.run.app"
+base="https://simply-tables-quote-api-442186711676.us-central1.run.app"
 curl -i "$base/health"
 curl -i "$base/api/material-context"
 curl -i "$base/api/quotes"
