@@ -15,6 +15,7 @@ const COST_CATEGORIES = [
 
 const MULTIPLIER_TYPES = [
   { value: 'fixed', label: 'Fixed' },
+  { value: 'per_piece', label: 'Pieces' },
   { value: 'per_base', label: 'Per Base' },
   { value: 'per_sqft', label: 'Per Sq Ft' },
   { value: 'per_bdft', label: 'Per Bd Ft' },
@@ -31,23 +32,23 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
   const [label, setLabel] = useState(block.label || '')
   const [costPerUnit, setCostPerUnit] = useState(String(block.cost_per_unit ?? ''))
   const [totalAmount, setTotalAmount] = useState(String(block.total_amount ?? ''))
+  const [unitsPerProduct, setUnitsPerProduct] = useState(String(block.units_per_product ?? 1))
 
   // Track which field is focused to avoid clobbering during edits
   const focusRef = useRef(null)
 
-  // Sync from props only when the block identity changes (not on every re-render)
+  // Sync from props only when the block identity changes
   const prevBlockIdRef = useRef(block.id)
   if (block.id !== prevBlockIdRef.current) {
     prevBlockIdRef.current = block.id
     setLabel(block.label || '')
     setCostPerUnit(String(block.cost_per_unit ?? ''))
     setTotalAmount(String(block.total_amount ?? ''))
+    setUnitsPerProduct(String(block.units_per_product ?? 1))
   }
 
   // Sync individual fields from props only when NOT focused
-  // This lets external changes (from other users or recalc) flow in
-  // without clobbering the user's in-progress typing
-  const prevPropsRef = useRef({ label: block.label, cpu: block.cost_per_unit, ta: block.total_amount })
+  const prevPropsRef = useRef({ label: block.label, cpu: block.cost_per_unit, ta: block.total_amount, upp: block.units_per_product })
   if (block.label !== prevPropsRef.current.label && focusRef.current !== 'label') {
     setLabel(block.label || '')
   }
@@ -57,7 +58,10 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
   if (block.total_amount !== prevPropsRef.current.ta && focusRef.current !== 'totalAmount') {
     setTotalAmount(String(block.total_amount ?? ''))
   }
-  prevPropsRef.current = { label: block.label, cpu: block.cost_per_unit, ta: block.total_amount }
+  if (block.units_per_product !== prevPropsRef.current.upp && focusRef.current !== 'unitsPerProduct') {
+    setUnitsPerProduct(String(block.units_per_product ?? 1))
+  }
+  prevPropsRef.current = { label: block.label, cpu: block.cost_per_unit, ta: block.total_amount, upp: block.units_per_product }
 
   const isGroup = block.block_type === 'group'
 
@@ -83,6 +87,16 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
       onBlockUpdate({ total_amount: val })
     }
   }
+
+  function saveUnitsPerProduct() {
+    focusRef.current = null
+    const val = parseFloat(unitsPerProduct)
+    if (!isNaN(val) && val !== block.units_per_product) {
+      onBlockUpdate({ units_per_product: val })
+    }
+  }
+
+  const showUnitsPP = !isGroup && (block.multiplier_type === 'fixed' || block.multiplier_type === 'per_piece')
 
   return (
     <div className="canvas-block-fields">
@@ -151,6 +165,20 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
               placeholder="$/unit"
               title="Cost per unit"
             />
+            {showUnitsPP && (
+              <input
+                className="canvas-block-num-input"
+                type="number"
+                step="1"
+                value={unitsPerProduct}
+                onChange={e => setUnitsPerProduct(e.target.value)}
+                onFocus={() => { focusRef.current = 'unitsPerProduct' }}
+                onBlur={saveUnitsPerProduct}
+                placeholder="qty"
+                title="Units per product (pieces per table)"
+                style={{ width: 50 }}
+              />
+            )}
           </>
         )}
       </div>

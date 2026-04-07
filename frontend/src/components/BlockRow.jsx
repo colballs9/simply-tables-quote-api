@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { Trash2 } from 'lucide-react'
 import { quoteBlocks } from '../api/client'
 import BlockRowCost from './BlockRowCost'
@@ -10,11 +11,13 @@ function formatCost(val) {
 
 function formatHours(val) {
   if (val == null) return '--'
-  return Number(val).toFixed(1) + 'h'
+  return Number(val).toFixed(2) + 'h'
 }
 
 export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
   const isCost = block.block_domain === 'cost'
+  const isUnit = block.block_type === 'unit'
+  const isGroup = block.block_type === 'group'
   const memberMap = {}
   ;(block.members || []).forEach(m => {
     memberMap[m.product_id] = m
@@ -80,14 +83,24 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
             className={`canvas-cell canvas-cell--value ${isCost ? 'canvas-cell--cost-value' : 'canvas-cell--labor-value'}`}
           >
             {isMember ? (
-              <div className="canvas-member-value" title="Click to remove from block">
-                <span
-                  className={`canvas-computed ${isCost ? 'canvas-computed--cost' : 'canvas-computed--hours'}`}
-                  onClick={() => toggleMember(product.id)}
-                >
-                  {isCost ? formatCost(member.cost_pp) : formatHours(member.hours_pp)}
-                </span>
-              </div>
+              isUnit ? (
+                <UnitMemberCell
+                  block={block}
+                  member={member}
+                  product={product}
+                  isCost={isCost}
+                  onQuoteUpdate={onQuoteUpdate}
+                />
+              ) : (
+                <div className="canvas-member-value" title="Click to remove from block">
+                  <span
+                    className={`canvas-computed ${isCost ? 'canvas-computed--cost' : 'canvas-computed--hours'}`}
+                    onClick={() => toggleMember(product.id)}
+                  >
+                    {isCost ? formatCost(member.cost_pp) : formatHours(member.hours_pp)}
+                  </span>
+                </div>
+              )
             ) : (
               <div className="canvas-member-empty">
                 <input
@@ -106,5 +119,61 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
       {/* Spacer for the add-column */}
       <div className="canvas-cell canvas-cell--spacer" />
     </>
+  )
+}
+
+
+function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
+  // For cost blocks: editable cost_per_unit (member override or block-level)
+  // For labor blocks: editable hours_per_unit (member override or block-level)
+  const effectiveValue = isCost
+    ? (member.cost_per_unit ?? block.cost_per_unit ?? '')
+    : (member.hours_per_unit ?? block.hours_per_unit ?? '')
+
+  const [localVal, setLocalVal] = useState(String(effectiveValue))
+  const focusRef = useRef(null)
+
+  // Sync from props when not focused
+  const prevValRef = useRef(effectiveValue)
+  if (effectiveValue !== prevValRef.current && !focusRef.current) {
+    setLocalVal(String(effectiveValue ?? ''))
+  }
+  prevValRef.current = effectiveValue
+
+  async function saveValue() {
+    focusRef.current = null
+    const val = parseFloat(localVal)
+    if (isNaN(val)) return
+    const field = isCost ? 'cost_per_unit' : 'hours_per_unit'
+    const currentMemberVal = isCost ? member.cost_per_unit : member.hours_per_unit
+    // Only save if changed from the effective value
+    if (val === effectiveValue) return
+    try {
+      const updated = await quoteBlocks.updateMember(block.id, product.id, { [field]: val })
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to update member:', err)
+    }
+  }
+
+  const computedPP = isCost ? member.cost_pp : member.hours_pp
+
+  return (
+    <div className="canvas-unit-cell">
+      <input
+        className={`canvas-unit-input ${isCost ? 'canvas-unit-input--cost' : 'canvas-unit-input--hours'}`}
+        type="number"
+        step={isCost ? '0.01' : '0.01'}
+        value={localVal}
+        onChange={e => setLocalVal(e.target.value)}
+        onFocus={() => { focusRef.current = true }}
+        onBlur={saveValue}
+        title={isCost ? 'Cost per unit' : 'Hours per unit'}
+      />
+      <span className={`canvas-unit-pp ${isCost ? 'canvas-unit-pp--cost' : 'canvas-unit-pp--hours'}`}>
+        {isCost ? formatCost(computedPP) : formatHours(computedPP)}
+        <span className="canvas-unit-pp-label"> pp</span>
+      </span>
+    </div>
   )
 }
