@@ -22,8 +22,10 @@ export default function QuoteBuilder() {
   const [selectedOptionId, setSelectedOptionId] = useState('')
   const [selectedProductId, setSelectedProductId] = useState(null)
 
-  // Local project name with debounced save
+  // Local state for text/number inputs (save on blur, not every keystroke)
   const [localProjectName, setLocalProjectName] = useState('')
+  const [localDealId, setLocalDealId] = useState('')
+  const [localRepRate, setLocalRepRate] = useState('')
   const projectNameTimerRef = useRef(null)
 
   // Load or create quote
@@ -42,6 +44,8 @@ export default function QuoteBuilder() {
       const data = await quotes.get(id)
       setQuote(data)
       setLocalProjectName(data.project_name || '')
+      setLocalDealId(data.deal_id || '')
+      setLocalRepRate(String(data.rep_rate ?? 0.08))
       if (!selectedOptionId && data.options?.[0]?.id) {
         setSelectedOptionId(data.options[0].id)
       }
@@ -59,6 +63,8 @@ export default function QuoteBuilder() {
       navigate(`/quotes/${data.id}`, { replace: true })
       setQuote(data)
       setLocalProjectName(data.project_name || '')
+      setLocalDealId(data.deal_id || '')
+      setLocalRepRate(String(data.rep_rate ?? 0.08))
       if (data.options?.[0]?.id) {
         setSelectedOptionId(data.options[0].id)
       }
@@ -235,8 +241,13 @@ export default function QuoteBuilder() {
           <div className="field" style={{ minWidth: 120 }}>
             <label>Deal ID</label>
             <input
-              value={quote.deal_id || ''}
-              onChange={e => handleQuoteFieldChange('deal_id', e.target.value)}
+              value={localDealId}
+              onChange={e => setLocalDealId(e.target.value)}
+              onBlur={() => {
+                if (localDealId !== (quote.deal_id || '')) {
+                  handleQuoteFieldChange('deal_id', localDealId)
+                }
+              }}
               placeholder="0670"
             />
           </div>
@@ -268,8 +279,14 @@ export default function QuoteBuilder() {
               <input
                 type="number"
                 step="0.01"
-                value={quote.rep_rate || 0.08}
-                onChange={e => handleQuoteFieldChange('rep_rate', parseFloat(e.target.value))}
+                value={localRepRate}
+                onChange={e => setLocalRepRate(e.target.value)}
+                onBlur={() => {
+                  const val = parseFloat(localRepRate)
+                  if (!isNaN(val) && val !== quote.rep_rate) {
+                    handleQuoteFieldChange('rep_rate', val)
+                  }
+                }}
               />
             </div>
           )}

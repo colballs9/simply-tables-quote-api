@@ -5,7 +5,9 @@ Every mutation triggers quote recalculation.
 
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import Quote, QuoteBlock, QuoteBlockMember, Product
@@ -132,18 +134,17 @@ async def update_member(
     data: QuoteBlockMemberUpdate,
     db: AsyncSession = Depends(get_db),
 ):
-    block = await db.get(QuoteBlock, block_id)
-    if not block:
-        raise HTTPException(404, "Block not found")
-
-    # Find the member
-    member = None
-    for m in block.members:
-        if m.product_id == product_id:
-            member = m
-            break
+    # Query member directly by composite key instead of lazy-loading block.members
+    stmt = (
+        select(QuoteBlockMember)
+        .where(QuoteBlockMember.quote_block_id == block_id, QuoteBlockMember.product_id == product_id)
+        .options(selectinload(QuoteBlockMember.block))
+    )
+    result = await db.execute(stmt)
+    member = result.scalar_one_or_none()
     if not member:
         raise HTTPException(404, "Member not found")
+    block = member.block
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(member, field, value)
@@ -159,17 +160,19 @@ async def remove_member(
     product_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    block = await db.get(QuoteBlock, block_id)
-    if not block:
-        raise HTTPException(404, "Block not found")
-
-    for member in block.members:
-        if member.product_id == product_id:
-            await db.delete(member)
-            break
-    else:
+    # Query member directly instead of lazy-loading block.members
+    stmt = (
+        select(QuoteBlockMember)
+        .where(QuoteBlockMember.quote_block_id == block_id, QuoteBlockMember.product_id == product_id)
+        .options(selectinload(QuoteBlockMember.block))
+    )
+    result = await db.execute(stmt)
+    member = result.scalar_one_or_none()
+    if not member:
         raise HTTPException(404, "Member not found in block")
 
+    quote_id = member.block.quote_id
+    await db.delete(member)
     await db.flush()
-    result = await recalculate_quote(db, block.quote_id)
+    result = await recalculate_quote(db, quote_id)
     return QuoteRead.model_validate(result)
