@@ -1094,6 +1094,508 @@ a:hover { color: var(--green-200); }
   padding: 8px 0;
 }
 
+/* ── Canvas Grid (Phase 2E) ── */
+
+.canvas-grid-wrapper {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.canvas-grid {
+  display: grid;
+  gap: 0;
+  min-width: max-content;
+}
+
+/* ── Canvas Cells ── */
+
+.canvas-cell {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.canvas-cell--header {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 8px;
+  min-height: 56px;
+}
+
+.canvas-cell--label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-primary);
+  width: 240px;
+  min-width: 240px;
+}
+
+.canvas-cell--value {
+  width: 140px;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.canvas-cell--spacer {
+  min-width: 48px;
+  border-bottom: none;
+}
+
+.canvas-cell--block {
+  align-items: flex-start;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* ── Section Headers ── */
+
+.canvas-section-header {
+  padding: 10px 8px 6px;
+  display: flex;
+  align-items: center;
+}
+
+.canvas-section-header span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.canvas-section-header--cost span { color: var(--cost-text); }
+.canvas-section-header--labor span { color: var(--hours-text); }
+.canvas-section-header--pricing span { color: var(--green-300); }
+
+/* ── Product Header Cells ── */
+
+.canvas-product-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.canvas-product-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 4px;
+}
+
+.canvas-product-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.canvas-product-title:hover {
+  color: var(--accent-text);
+}
+
+.canvas-product-title-input {
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  width: 100%;
+  max-width: 110px;
+}
+
+.canvas-product-title-input:focus {
+  outline: none;
+}
+
+.canvas-product-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.canvas-product-header:hover .canvas-product-delete {
+  opacity: 1;
+}
+
+.canvas-product-delete:hover {
+  color: #c45a5a;
+  background: rgba(196,90,90,0.1);
+}
+
+.canvas-product-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.canvas-product-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--accent-dim);
+  color: var(--accent-text);
+}
+
+.canvas-product-qty {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.canvas-product-dims {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.canvas-cell--add {
+  justify-content: center;
+  min-width: 48px;
+}
+
+.canvas-add-product-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.canvas-add-product-btn:hover {
+  border-color: var(--green-600);
+  color: var(--green-200);
+  background: var(--accent-dim);
+}
+
+/* ── Block Label Cells ── */
+
+.canvas-block-label-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.canvas-block-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.canvas-block-label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.canvas-block-label-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  padding: 1px 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.canvas-block-label-input:hover {
+  border-bottom-color: var(--border);
+}
+
+.canvas-block-label-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.canvas-block-fields-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.canvas-block-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 18px 3px 6px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%235a6662' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+  min-width: 0;
+  max-width: 90px;
+}
+
+.canvas-block-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.canvas-block-num-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  width: 70px;
+  min-width: 50px;
+}
+
+.canvas-block-num-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.canvas-block-type-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border-radius: 3px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
+
+.canvas-block-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.canvas-cell--block:hover .canvas-block-delete {
+  opacity: 1;
+}
+
+.canvas-block-delete:hover {
+  color: #c45a5a;
+  background: rgba(196,90,90,0.1);
+}
+
+/* ── Block Member Cells ── */
+
+.canvas-member-value {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.canvas-computed {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.canvas-computed:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.canvas-computed--cost { color: var(--cost-text); }
+.canvas-computed--hours { color: var(--hours-text); }
+
+.canvas-member-empty {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.canvas-member-checkbox {
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  opacity: 0.4;
+}
+
+.canvas-member-checkbox:hover {
+  opacity: 1;
+}
+
+/* ── Cost/Labor cell tinting ── */
+
+.canvas-cell--cost {
+  border-left: 2px solid var(--cost-border);
+}
+
+.canvas-cell--labor {
+  border-left: 2px solid var(--hours-border);
+}
+
+.canvas-cell--cost-value {
+  background: rgba(42, 26, 8, 0.2);
+}
+
+.canvas-cell--labor-value {
+  background: rgba(26, 16, 37, 0.2);
+}
+
+.canvas-empty-section {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 8px 12px;
+}
+
+/* ── Add Block Rows ── */
+
+.canvas-add-row {
+  padding: 4px 8px 8px;
+}
+
+.canvas-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.canvas-add-btn--cost {
+  color: var(--cost-text);
+}
+
+.canvas-add-btn--cost:hover {
+  border-color: var(--cost-border);
+  background: var(--cost-bg);
+}
+
+.canvas-add-btn--labor {
+  color: var(--hours-text);
+}
+
+.canvas-add-btn--labor:hover {
+  border-color: var(--hours-border);
+  background: var(--hours-bg);
+}
+
+/* ── Pricing Row Cells ── */
+
+.canvas-cell--pricing-label {
+  background: var(--bg-primary);
+}
+
+.canvas-pricing-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.canvas-cell--pricing-value {
+  justify-content: center;
+}
+
+.canvas-pricing-value {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.canvas-pricing-value--cost { color: var(--cost-text); }
+.canvas-pricing-value--hours { color: var(--hours-text); }
+.canvas-pricing-value--price { color: var(--green-300); }
+.canvas-pricing-value--final {
+  color: var(--green-200);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* ── Selected Product Header ── */
+
+.canvas-product-header--selected {
+  background: var(--accent-dim);
+  border-bottom-color: var(--green-600);
+}
+
+/* ── Margin Rate Editor (Side Panel) ── */
+
+.sp-margin-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sp-margin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sp-margin-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.sp-margin-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  width: 60px;
+  text-align: right;
+}
+
+.sp-margin-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 /* ── Animations ── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

@@ -1,5 +1,5 @@
 """
-Simply Tables — Calculation Engine V1
+Simply Tables — Calculation Engine V2 (Quote Block Architecture)
 
 Pure-function engine that computes all derived values for quotes.
 No database calls — receives data dicts, returns computed results.
@@ -11,6 +11,9 @@ Three block patterns:
     Unit Block:  value × multiplier → PP
     Group Block: lump sum ÷ proportional → PP
     Rate Block:  metric ÷ rate → proportional hours
+
+V2 change: blocks are now quote-level with per-product members,
+instead of per-product blocks + separate group pools.
 """
 
 from __future__ import annotations
@@ -166,7 +169,7 @@ def compute_dimensions(product: dict) -> dict:
 def compute_dimension_string(product: dict) -> str:
     """
     Build the customer-facing dimension string.
-    
+
     Sheet formulas (rows 1539-1541):
         Standard: '36" x 48" - Dining Height'
         DIA:      '30" DIA - Bar Height'
@@ -251,7 +254,7 @@ def compute_component(component: dict, product: dict) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 4. Panel Data
+# 3. Panel Data
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_panel_data(product: dict) -> dict:
@@ -301,13 +304,15 @@ def compute_panel_data(product: dict) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 3. Unit Cost Block
+# 4. Unit Cost Block (per member)
 # ──────────────────────────────────────────────────────────────────────
 
-def compute_cost_block(block: dict, product: dict) -> dict:
+def compute_cost_block(block: dict, member: dict, product: dict) -> dict:
     """
-    Compute a unit cost block: cost_per_unit × multiplier → PP → PT.
-    
+    Compute a unit cost block for a specific product member.
+
+    Uses member-level cost_per_unit override if present, otherwise block-level.
+
     multiplier_type determines what units_per_product resolves to:
         'per_unit'  → units_per_product (flat cost per table; canonical name)
         'per_piece' → units_per_product (same math; UI labels it "pieces per table")
@@ -315,12 +320,13 @@ def compute_cost_block(block: dict, product: dict) -> dict:
         'per_base'  → bases_per_top
         'per_sqft'  → sq_ft (DIA-adjusted area for material cost)
         'per_bdft'  → bd_ft
-    
+
     Sheet pattern (Unit Block):
         PP = CostPU × Multiplier
         PT = PP × Quantity
     """
-    cost_per_unit = _d(block.get("cost_per_unit"))
+    # Member override takes precedence over block-level value
+    cost_per_unit = _d(member.get("cost_per_unit") if member.get("cost_per_unit") is not None else block.get("cost_per_unit"))
     multiplier_type = block.get("multiplier_type", "per_unit")
     quantity = _d(product.get("quantity", 1))
 
@@ -332,9 +338,6 @@ def compute_cost_block(block: dict, product: dict) -> dict:
     elif multiplier_type == "per_bdft":
         multiplier = _d(product.get("bd_ft", 0))
     elif multiplier_type in ("per_unit", "per_piece", "fixed"):
-        # per_unit: flat cost per table (units_per_product = how many per table)
-        # per_piece: same math, UI shows "pieces per table" label
-        # fixed: legacy name, kept for backward compatibility
         multiplier = _d(block.get("units_per_product", 1))
     else:
         multiplier = _d(block.get("units_per_product", 1))
@@ -349,27 +352,27 @@ def compute_cost_block(block: dict, product: dict) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 4. Group Cost Pool
+# 5. Group Cost Block (distribute across members)
 # ──────────────────────────────────────────────────────────────────────
 
-def compute_group_cost_pool(pool: dict, members: list[dict], products: dict[str, dict]) -> list[dict]:
+def compute_group_cost_block(block: dict, members: list[dict], products: dict[str, dict]) -> list[dict]:
     """
-    Distribute a lump-sum cost across participating products proportionally.
-    
-    pool: the group_cost_pool record
-    members: list of pool_member records (each has product_id)
+    Distribute a lump-sum cost across participating product members proportionally.
+
+    block: the quote_block record (block_type = "group", block_domain = "cost")
+    members: list of member records (each has product_id)
     products: dict of product_id → product data (must include sq_ft, bd_ft, quantity)
-    
+
     Returns: list of updated member dicts with metric_value, cost_pp, cost_pt
-    
+
     Sheet pattern (Group Block):
         metric_value = product's contribution (qty, sqft*qty, bdft*qty)
         rate = total_amount / sum(all metric_values)
         cost_pp = metric_value / quantity × rate
         cost_pt = cost_pp × quantity
     """
-    total_amount = _d(pool.get("total_amount", 0))
-    dist_type = pool.get("distribution_type", "units")
+    total_amount = _d(block.get("total_amount", 0))
+    dist_type = block.get("distribution_type", "units")
 
     if total_amount == 0 or not members:
         return [
@@ -423,22 +426,23 @@ def compute_group_cost_pool(pool: dict, members: list[dict], products: dict[str,
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 5. Labor Blocks
+# 6. Labor Blocks
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_labor_block(
     block: dict,
+    member: dict,
     product: dict,
     all_products_metric_total: Optional[Decimal] = None,
     all_products_qty_total: Optional[Decimal] = None,
 ) -> dict:
     """
-    Compute a labor block's hours.
+    Compute a labor block's hours for a specific product member.
 
     block_type determines the calculation:
 
     'unit': Direct hours input.
-        hours_pp = hours_per_unit
+        hours_pp = hours_per_unit (member override or block-level)
         hours_pt = hours_pp × quantity
 
     'rate': Proportional hours from a rate.
@@ -460,17 +464,21 @@ def compute_labor_block(
         'sq_ft'       — DIA-adjusted sqft (use for LC104 when DIA products participate)
         'bd_ft'       — board footage
 
-    'group': Handled by group_labor_pools (same pattern as group cost pools)
+    'group': Handled by compute_group_labor_block (same pattern as group cost blocks)
     """
     block_type = block.get("block_type", "unit")
     quantity = _d(product.get("quantity", 1))
-    is_active = block.get("is_active", True)
+
+    # Check member-level is_active override, then block-level
+    is_active = member.get("is_active") if member.get("is_active") is not None else block.get("is_active", True)
 
     if not is_active:
         return {"hours_pp": Decimal("0"), "hours_pt": Decimal("0")}
 
     if block_type == "unit":
-        hours_pp = _d(block.get("hours_per_unit", 0))
+        # Member override takes precedence
+        hours_per_unit = member.get("hours_per_unit") if member.get("hours_per_unit") is not None else block.get("hours_per_unit", 0)
+        hours_pp = _d(hours_per_unit)
         hours_pt = hours_pp * quantity
         return {"hours_pp": hours_pp, "hours_pt": hours_pt}
 
@@ -481,17 +489,12 @@ def compute_labor_block(
 
         # Resolve this product's metric.
         if metric_source == "panel_sqft":
-            # W×L-based panel area (includes components). Falls back to sq_ft_wl.
             product_metric = _d(product.get("panel_sqft", product.get("sq_ft_wl", product.get("sq_ft", 0))))
         elif metric_source == "panel_count":
-            # LC103 Cutting: panels/hr, not sqft.
             product_metric = _d(product.get("panel_count", 0))
         elif metric_source == "sq_ft":
-            # DIA-adjusted area — used by LC104 which distributes by actual surface area.
-            # For non-DIA products sq_ft == sq_ft_wl.
             product_metric = _d(product.get("sq_ft", product.get("sq_ft_wl", 0)))
         elif metric_source == "top_sqft":
-            # W×L always (not DIA-adjusted). Standard for most rate labor centers.
             product_metric = _d(product.get("sq_ft_wl", product.get("sq_ft", 0)))
         elif metric_source == "bd_ft":
             product_metric = _d(product.get("bd_ft", 0))
@@ -502,9 +505,6 @@ def compute_labor_block(
             return {"hours_pp": Decimal("0"), "hours_pt": Decimal("0")}
 
         if rate_type == "units":
-            # LC104 pattern: rate is in tables/hr (units), not metric/hr.
-            # total_hours = total_qty_in_pool / rate
-            # hours_pp = (product_metric / total_metric) × total_hours / qty
             if (all_products_metric_total and all_products_metric_total > 0
                     and all_products_qty_total and all_products_qty_total > 0
                     and product_metric > 0):
@@ -512,11 +512,9 @@ def compute_labor_block(
                 product_metric_pt = product_metric * quantity
                 hours_pp = (product_metric_pt / all_products_metric_total) * total_hours / quantity
             else:
-                # Cannot compute without cross-product totals; return 0 as safe default.
                 hours_pp = Decimal("0")
         else:
-            # rate_type='metric' (default): total_hours = total_metric / rate
-            # Cross-product proportional simplifies to product_metric / rate.
+            # rate_type='metric' (default)
             if product_metric == 0:
                 return {"hours_pp": Decimal("0"), "hours_pt": Decimal("0")}
             if all_products_metric_total and all_products_metric_total > 0:
@@ -529,17 +527,17 @@ def compute_labor_block(
         hours_pt = hours_pp * quantity
         return {"hours_pp": hours_pp, "hours_pt": hours_pt}
 
-    # Group type handled by group_labor_pools
+    # Group type handled by compute_group_labor_block
     return {"hours_pp": Decimal("0"), "hours_pt": Decimal("0")}
 
 
-def compute_group_labor_pool(pool: dict, members: list[dict], products: dict[str, dict]) -> list[dict]:
+def compute_group_labor_block(block: dict, members: list[dict], products: dict[str, dict]) -> list[dict]:
     """
-    Distribute lump-sum hours across participating products.
-    Same pattern as group cost pools but for hours.
+    Distribute lump-sum hours across participating product members.
+    Same pattern as group cost blocks but for hours.
     """
-    total_hours = _d(pool.get("total_hours", 0))
-    dist_type = pool.get("distribution_type", "units")
+    total_hours = _d(block.get("total_hours", 0))
+    dist_type = block.get("distribution_type", "units")
 
     if total_hours == 0 or not members:
         return [
@@ -554,13 +552,6 @@ def compute_group_labor_pool(pool: dict, members: list[dict], products: dict[str
         qty = _d(prod.get("quantity", 1))
 
         if dist_type == "sqft":
-            # Currently uses sq_ft_wl (W×L) matching the cost pool behavior.
-            # KNOWN ISSUE: some labor pools may use DIA-adjusted sq_ft instead.
-            # Farmhouse Kitchen 0737 LC100 produces 0.0397h for T1 only when T2
-            # contributes 19.635 sqft-units (DIA-adjusted), not 25 (W×L = sq_ft_wl).
-            # This needs a per-pool flag (e.g. dist_sqft_source: "sq_ft" | "sq_ft_wl")
-            # to be resolved when the UI exposes pool distribution configuration.
-            # TODO: add dist_sqft_source to group_labor_pools (and group_cost_pools for consistency).
             metric = _d(prod.get("sq_ft_wl", prod.get("sq_ft", 0))) * qty
         elif dist_type == "bdft":
             metric = _d(prod.get("bd_ft", 0)) * qty
@@ -591,20 +582,21 @@ def compute_group_labor_pool(pool: dict, members: list[dict], products: dict[str
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 6. Product Pricing Assembly
+# 7. Product Pricing Assembly
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_product_pricing(
     product: dict,
-    cost_blocks: list[dict],
-    group_cost_shares: list[dict],
-    labor_blocks: list[dict],
-    group_labor_shares: list[dict],
+    cost_results: list[dict],
+    labor_results: list[dict],
     quote: dict,
 ) -> dict:
     """
     Assemble final pricing for a single product.
-    
+
+    cost_results: list of dicts with cost_pp, cost_category (from all cost blocks for this product)
+    labor_results: list of dicts with hours_pp, labor_center (from all labor blocks for this product)
+
     Sheet logic (rows 1183-1283):
         1. Sum material costs by category
         2. Apply per-category margin rates
@@ -624,14 +616,9 @@ def compute_product_pricing(
     # ── Step 1: Aggregate costs by category ──
     category_costs: dict[str, Decimal] = {}
 
-    for block in cost_blocks:
-        cat = block.get("cost_category", "other")
-        category_costs[cat] = category_costs.get(cat, Decimal("0")) + _d(block.get("cost_pp", 0))
-
-    for share in group_cost_shares:
-        # Group shares carry their pool's category
-        cat = share.get("cost_category", "group_cost")
-        category_costs[cat] = category_costs.get(cat, Decimal("0")) + _d(share.get("cost_pp", 0))
+    for item in cost_results:
+        cat = item.get("cost_category", "other")
+        category_costs[cat] = category_costs.get(cat, Decimal("0")) + _d(item.get("cost_pp", 0))
 
     # ── Step 2: Apply margins per category ──
     total_cost_pp = Decimal("0")
@@ -661,15 +648,9 @@ def compute_product_pricing(
     total_hours_pp = Decimal("0")
     hours_by_lc: dict[str, Decimal] = {}
 
-    for block in labor_blocks:
-        lc = block.get("labor_center", "unknown")
-        hrs = _d(block.get("hours_pp", 0))
-        total_hours_pp += hrs
-        hours_by_lc[lc] = hours_by_lc.get(lc, Decimal("0")) + hrs
-
-    for share in group_labor_shares:
-        lc = share.get("labor_center", "unknown")
-        hrs = _d(share.get("hours_pp", 0))
+    for item in labor_results:
+        lc = item.get("labor_center", "unknown")
+        hrs = _d(item.get("hours_pp", 0))
         total_hours_pp += hrs
         hours_by_lc[lc] = hours_by_lc.get(lc, Decimal("0")) + hrs
 
@@ -714,19 +695,17 @@ def compute_product_pricing(
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 7. Tag Summary
+# 8. Tag Summary
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_tag_summary(
-    cost_blocks: list[dict],
-    labor_blocks: list[dict],
-    group_cost_shares: list[dict],
-    group_labor_shares: list[dict],
+    cost_results: list[dict],
+    labor_results: list[dict],
     tags: dict[str, str],   # tag_id → tag_name
 ) -> dict[str, dict]:
     """
     Aggregate costs and hours by tag for price breakdown.
-    
+
     Returns: {tag_name: {"cost_pp": x, "hours_pp": y, "cost_pt": z, "hours_pt": w}}
     """
     summary: dict[str, dict] = {}
@@ -749,20 +728,16 @@ def compute_tag_summary(
         if hours_pt:
             summary[tag_name]["hours_pt"] += _d(hours_pt)
 
-    for b in cost_blocks:
+    for b in cost_results:
         _add(b.get("tag_id"), cost_pp=b.get("cost_pp"), cost_pt=b.get("cost_pt"))
-    for s in group_cost_shares:
-        _add(s.get("tag_id"), cost_pp=s.get("cost_pp"), cost_pt=s.get("cost_pt"))
-    for b in labor_blocks:
+    for b in labor_results:
         _add(b.get("tag_id"), hours_pp=b.get("hours_pp"), hours_pt=b.get("hours_pt"))
-    for s in group_labor_shares:
-        _add(s.get("tag_id"), hours_pp=s.get("hours_pp"), hours_pt=s.get("hours_pt"))
 
     return summary
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 8. Option & Quote Totals
+# 9. Option & Quote Totals
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_option_totals(product_results: list[dict]) -> dict:
@@ -789,12 +764,7 @@ def compute_option_totals(product_results: list[dict]) -> dict:
 def compute_quote_totals(option_results: list[dict], shipping: Decimal = Decimal("0")) -> dict:
     """
     Roll up option totals to quote level.
-    For single-option quotes this is just a pass-through.
-    For multi-option quotes, each option has independent totals —
-    the quote total reflects the primary/selected option.
     """
-    # For now, sum all options (single-option case)
-    # Future: allow selecting which option is the "active" one
     total_cost = sum(_d(o.get("total_cost", 0)) for o in option_results)
     total_price = sum(_d(o.get("total_price", 0)) for o in option_results)
     total_hours = sum(_d(o.get("total_hours", 0)) for o in option_results)
@@ -809,49 +779,48 @@ def compute_quote_totals(option_results: list[dict], shipping: Decimal = Decimal
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 9. Full Quote Computation (Orchestrator)
+# 10. Full Quote Computation (Orchestrator)
 # ──────────────────────────────────────────────────────────────────────
 
 def compute_quote(quote_data: dict) -> dict:
     """
     Top-level orchestrator. Takes a full quote data structure and computes
     every derived value.
-    
-    Expected input structure:
+
+    V2 input structure:
     {
-        "quote": { id, project_name, has_rep, rep_rate, status, ... },
+        "quote": { id, has_rep, rep_rate, shipping, ... },
         "tags": { tag_id: tag_name, ... },
         "options": [
             {
                 "id": ...,
-                "name": "Standard",
                 "products": [
-                    {
-                        "id": ..., "quantity": 2, "width": 36, "length": 48, ...
-                        "cost_blocks": [ { cost_per_unit, multiplier_type, ... }, ... ],
-                        "labor_blocks": [ { block_type, labor_center, ... }, ... ],
-                    },
+                    { "id": ..., "quantity": 2, "width": 36, ... , "components": [...] },
+                    ...
+                ],
+            },
+        ],
+        "quote_blocks": [
+            {
+                "id": ..., "block_domain": "cost", "block_type": "unit",
+                "cost_category": "unit_cost", "cost_per_unit": 50, ...
+                "members": [
+                    { "id": ..., "product_id": "...", "cost_per_unit": null, ... },
                     ...
                 ],
             },
             ...
         ],
-        "group_cost_pools": [
-            { "total_amount": 300, "distribution_type": "units", "members": [...], ... },
-            ...
-        ],
-        "group_labor_pools": [ ... ],
     }
-    
-    Returns the same structure with all computed fields populated.
+
+    Returns the same structure with all computed fields populated on members and products.
     """
     quote = quote_data.get("quote", {})
     tags = quote_data.get("tags", {})
     options = quote_data.get("options", [])
-    group_cost_pools = quote_data.get("group_cost_pools", [])
-    group_labor_pools = quote_data.get("group_labor_pools", [])
+    quote_blocks = quote_data.get("quote_blocks", [])
 
-    # Build product lookup for group pool distribution
+    # Build product lookup
     all_products: dict[str, dict] = {}
     for option in options:
         for product in option.get("products", []):
@@ -864,107 +833,164 @@ def compute_quote(quote_data: dict) -> dict:
         product["dimension_string"] = compute_dimension_string(product)
 
     # ── Phase 1.25: Compute component dimensions (Material Builder) ──
-    # Must run after product dimensions (needs bases_per_top) and before panel data.
     for pid, product in all_products.items():
         for comp in product.get("components", []):
             comp.update(compute_component(comp, product))
 
     # ── Phase 1.5: Compute panel data ──
-    # Must run after components (panel_sqft includes component sqft) and before labor.
     for pid, product in all_products.items():
         panel_data = compute_panel_data(product)
         product.update(panel_data)
 
-    # ── Phase 2: Compute unit cost blocks ──
-    for pid, product in all_products.items():
-        for block in product.get("cost_blocks", []):
-            result = compute_cost_block(block, product)
-            block.update(result)
+    # ── Phase 2: Pre-compute cross-product totals for rate_type='units' labor blocks ──
+    _units_metric_totals: dict[str, Decimal] = {}  # block_id → total metric
+    _units_qty_totals: dict[str, Decimal] = {}     # block_id → total qty
 
-    # ── Phase 3: Compute group cost pools ──
-    group_cost_shares_by_product: dict[str, list] = {pid: [] for pid in all_products}
-
-    for pool in group_cost_pools:
-        members = pool.get("members", [])
-        products_for_pool = {
-            m["product_id"]: all_products[m["product_id"]]
-            for m in members
-            if m["product_id"] in all_products
-        }
-        computed_members = compute_group_cost_pool(pool, members, products_for_pool)
-
-        for cm in computed_members:
-            pid = cm["product_id"]
-            # Attach pool-level info for pricing assembly
-            cm["cost_category"] = pool.get("cost_category", "group_cost")
-            cm["tag_id"] = pool.get("tag_id")
-            if pid in group_cost_shares_by_product:
-                group_cost_shares_by_product[pid].append(cm)
-
-        pool["members"] = computed_members
-
-    # ── Phase 4: Compute labor blocks ──
-    # For rate_type='units' blocks (e.g. LC104), we need cross-product totals:
-    # total_qty and total_metric across all products carrying that block type.
-    # Key = (labor_center, rate_value, metric_source) — identifies a shared rate pool.
-    _units_metric_totals: dict[tuple, Decimal] = {}
-    _units_qty_totals: dict[tuple, Decimal] = {}
-
-    for pid, product in all_products.items():
-        for block in product.get("labor_blocks", []):
-            if block.get("block_type") == "rate" and block.get("rate_type") == "units":
-                key = (block.get("labor_center"), block.get("rate_value"), block.get("metric_source"))
-                qty = _d(product.get("quantity", 1))
-                ms = block.get("metric_source", "top_sqft")
-                if ms == "sq_ft":
-                    metric = _d(product.get("sq_ft", product.get("sq_ft_wl", 0)))
-                elif ms == "panel_sqft":
-                    metric = _d(product.get("panel_sqft", product.get("sq_ft_wl", 0)))
-                elif ms == "panel_count":
-                    metric = _d(product.get("panel_count", 0))
-                elif ms == "bd_ft":
-                    metric = _d(product.get("bd_ft", 0))
+    for block in quote_blocks:
+        if block.get("block_domain") == "labor" and block.get("block_type") == "rate" and block.get("rate_type") == "units":
+            bid = block["id"]
+            metric_source = block.get("metric_source", "top_sqft")
+            for member in block.get("members", []):
+                pid = member["product_id"]
+                prod = all_products.get(pid, {})
+                qty = _d(prod.get("quantity", 1))
+                if metric_source == "sq_ft":
+                    metric = _d(prod.get("sq_ft", prod.get("sq_ft_wl", 0)))
+                elif metric_source == "panel_sqft":
+                    metric = _d(prod.get("panel_sqft", prod.get("sq_ft_wl", 0)))
+                elif metric_source == "panel_count":
+                    metric = _d(prod.get("panel_count", 0))
+                elif metric_source == "bd_ft":
+                    metric = _d(prod.get("bd_ft", 0))
                 else:
-                    metric = _d(product.get("sq_ft_wl", product.get("sq_ft", 0)))
-                _units_metric_totals[key] = _units_metric_totals.get(key, Decimal("0")) + metric * qty
-                _units_qty_totals[key] = _units_qty_totals.get(key, Decimal("0")) + qty
+                    metric = _d(prod.get("sq_ft_wl", prod.get("sq_ft", 0)))
+                _units_metric_totals[bid] = _units_metric_totals.get(bid, Decimal("0")) + metric * qty
+                _units_qty_totals[bid] = _units_qty_totals.get(bid, Decimal("0")) + qty
 
-    for pid, product in all_products.items():
-        for block in product.get("labor_blocks", []):
-            if block.get("block_type") != "group":
-                if block.get("rate_type") == "units":
-                    key = (block.get("labor_center"), block.get("rate_value"), block.get("metric_source"))
-                    result = compute_labor_block(
-                        block, product,
-                        all_products_metric_total=_units_metric_totals.get(key),
-                        all_products_qty_total=_units_qty_totals.get(key),
-                    )
+    # ── Phase 2.5: Pre-compute cross-product totals for rate_type='metric' rate blocks ──
+    # Needed for proportional distribution across members
+    _metric_totals: dict[str, Decimal] = {}  # block_id → total metric*qty across all members
+
+    for block in quote_blocks:
+        if block.get("block_domain") == "labor" and block.get("block_type") == "rate" and block.get("rate_type", "metric") == "metric":
+            bid = block["id"]
+            metric_source = block.get("metric_source", "top_sqft")
+            for member in block.get("members", []):
+                pid = member["product_id"]
+                prod = all_products.get(pid, {})
+                qty = _d(prod.get("quantity", 1))
+                if metric_source == "panel_sqft":
+                    metric = _d(prod.get("panel_sqft", prod.get("sq_ft_wl", prod.get("sq_ft", 0))))
+                elif metric_source == "panel_count":
+                    metric = _d(prod.get("panel_count", 0))
+                elif metric_source == "sq_ft":
+                    metric = _d(prod.get("sq_ft", prod.get("sq_ft_wl", 0)))
+                elif metric_source == "top_sqft":
+                    metric = _d(prod.get("sq_ft_wl", prod.get("sq_ft", 0)))
+                elif metric_source == "bd_ft":
+                    metric = _d(prod.get("bd_ft", 0))
                 else:
-                    result = compute_labor_block(block, product)
-                block.update(result)
+                    metric = _d(prod.get("sq_ft_wl", prod.get("sq_ft", 0)))
+                _metric_totals[bid] = _metric_totals.get(bid, Decimal("0")) + metric * qty
 
-    # ── Phase 5: Compute group labor pools ──
-    group_labor_shares_by_product: dict[str, list] = {pid: [] for pid in all_products}
+    # ── Phase 3: Compute all blocks ──
+    # Collect per-product cost/labor results for pricing assembly
+    cost_results_by_product: dict[str, list] = {pid: [] for pid in all_products}
+    labor_results_by_product: dict[str, list] = {pid: [] for pid in all_products}
 
-    for pool in group_labor_pools:
-        members = pool.get("members", [])
-        products_for_pool = {
-            m["product_id"]: all_products[m["product_id"]]
-            for m in members
-            if m["product_id"] in all_products
-        }
-        computed_members = compute_group_labor_pool(pool, members, products_for_pool)
+    for block in quote_blocks:
+        bid = block["id"]
+        domain = block.get("block_domain", "cost")
+        btype = block.get("block_type", "unit")
+        members = block.get("members", [])
 
-        for cm in computed_members:
-            pid = cm["product_id"]
-            cm["labor_center"] = pool.get("labor_center", "unknown")
-            cm["tag_id"] = pool.get("tag_id")
-            if pid in group_labor_shares_by_product:
-                group_labor_shares_by_product[pid].append(cm)
+        if domain == "cost":
+            if btype == "group":
+                # Group cost distribution
+                member_dicts = [{"product_id": m["product_id"], "id": m.get("id")} for m in members]
+                computed = compute_group_cost_block(block, member_dicts, all_products)
+                for i, cm in enumerate(computed):
+                    members[i]["cost_pp"] = cm["cost_pp"]
+                    members[i]["cost_pt"] = cm["cost_pt"]
+                    members[i]["metric_value"] = cm["metric_value"]
+                    members[i]["hours_pp"] = Decimal("0")
+                    members[i]["hours_pt"] = Decimal("0")
+                    pid = cm["product_id"]
+                    if pid in cost_results_by_product:
+                        cost_results_by_product[pid].append({
+                            "cost_pp": cm["cost_pp"],
+                            "cost_pt": cm["cost_pt"],
+                            "cost_category": block.get("cost_category", "group_cost"),
+                            "tag_id": block.get("tag_id"),
+                        })
+            else:
+                # Unit cost block — compute per member
+                for member in members:
+                    pid = member["product_id"]
+                    prod = all_products.get(pid, {})
+                    result = compute_cost_block(block, member, prod)
+                    member["cost_pp"] = result["cost_pp"]
+                    member["cost_pt"] = result["cost_pt"]
+                    member["hours_pp"] = Decimal("0")
+                    member["hours_pt"] = Decimal("0")
+                    member["metric_value"] = Decimal("0")
+                    if pid in cost_results_by_product:
+                        cost_results_by_product[pid].append({
+                            "cost_pp": result["cost_pp"],
+                            "cost_pt": result["cost_pt"],
+                            "cost_category": block.get("cost_category", "unit_cost"),
+                            "tag_id": block.get("tag_id"),
+                        })
 
-        pool["members"] = computed_members
+        elif domain == "labor":
+            if btype == "group":
+                # Group labor distribution
+                member_dicts = [{"product_id": m["product_id"], "id": m.get("id")} for m in members]
+                computed = compute_group_labor_block(block, member_dicts, all_products)
+                for i, cm in enumerate(computed):
+                    members[i]["hours_pp"] = cm["hours_pp"]
+                    members[i]["hours_pt"] = cm["hours_pt"]
+                    members[i]["metric_value"] = cm["metric_value"]
+                    members[i]["cost_pp"] = Decimal("0")
+                    members[i]["cost_pt"] = Decimal("0")
+                    pid = cm["product_id"]
+                    if pid in labor_results_by_product:
+                        labor_results_by_product[pid].append({
+                            "hours_pp": cm["hours_pp"],
+                            "hours_pt": cm["hours_pt"],
+                            "labor_center": block.get("labor_center", "unknown"),
+                            "tag_id": block.get("tag_id"),
+                        })
+            else:
+                # Rate or unit labor block — compute per member
+                for member in members:
+                    pid = member["product_id"]
+                    prod = all_products.get(pid, {})
+                    if block.get("rate_type") == "units":
+                        result = compute_labor_block(
+                            block, member, prod,
+                            all_products_metric_total=_units_metric_totals.get(bid),
+                            all_products_qty_total=_units_qty_totals.get(bid),
+                        )
+                    else:
+                        result = compute_labor_block(
+                            block, member, prod,
+                            all_products_metric_total=_metric_totals.get(bid),
+                        )
+                    member["hours_pp"] = result["hours_pp"]
+                    member["hours_pt"] = result["hours_pt"]
+                    member["cost_pp"] = Decimal("0")
+                    member["cost_pt"] = Decimal("0")
+                    member["metric_value"] = Decimal("0")
+                    if pid in labor_results_by_product:
+                        labor_results_by_product[pid].append({
+                            "hours_pp": result["hours_pp"],
+                            "hours_pt": result["hours_pt"],
+                            "labor_center": block.get("labor_center", "unknown"),
+                            "tag_id": block.get("tag_id"),
+                        })
 
-    # ── Phase 6: Assemble product pricing ──
+    # ── Phase 4: Assemble product pricing ──
     option_results = []
     for option in options:
         product_results = []
@@ -973,20 +999,16 @@ def compute_quote(quote_data: dict) -> dict:
 
             pricing = compute_product_pricing(
                 product=product,
-                cost_blocks=product.get("cost_blocks", []),
-                group_cost_shares=group_cost_shares_by_product.get(pid, []),
-                labor_blocks=product.get("labor_blocks", []),
-                group_labor_shares=group_labor_shares_by_product.get(pid, []),
+                cost_results=cost_results_by_product.get(pid, []),
+                labor_results=labor_results_by_product.get(pid, []),
                 quote=quote,
             )
             product.update(pricing)
 
             # Tag summary for this product
             product["tag_summary"] = compute_tag_summary(
-                cost_blocks=product.get("cost_blocks", []),
-                labor_blocks=product.get("labor_blocks", []),
-                group_cost_shares=group_cost_shares_by_product.get(pid, []),
-                group_labor_shares=group_labor_shares_by_product.get(pid, []),
+                cost_results=cost_results_by_product.get(pid, []),
+                labor_results=labor_results_by_product.get(pid, []),
                 tags=tags,
             )
 
@@ -997,7 +1019,7 @@ def compute_quote(quote_data: dict) -> dict:
         option.update(opt_totals)
         option_results.append(opt_totals)
 
-    # ── Phase 7: Quote totals ──
+    # ── Phase 5: Quote totals ──
     shipping = _d(quote.get("shipping", 0))
     quote_totals = compute_quote_totals(option_results, shipping)
     quote.update(quote_totals)

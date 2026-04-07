@@ -1,6 +1,6 @@
 /**
  * API client — all backend communication goes through here.
- * 
+ *
  * In dev, Vite proxies /api to localhost:8080.
  * In production, same origin serves both API and frontend.
  */
@@ -63,38 +63,22 @@ export const products = {
   delete: (optionId, productId) => request(`/options/${optionId}/products/${productId}`, { method: 'DELETE' }),
 };
 
-// ── Cost Blocks ──
+// ── Quote Blocks ──
 
-export const costBlocks = {
-  add: (productId, data) => request(`/products/${productId}/cost-blocks`, { method: 'POST', body: data }),
-  update: (productId, blockId, data) => request(`/products/${productId}/cost-blocks/${blockId}`, { method: 'PATCH', body: data }),
-  delete: (productId, blockId) => request(`/products/${productId}/cost-blocks/${blockId}`, { method: 'DELETE' }),
+export const quoteBlocks = {
+  create: (quoteId, data) => request(`/quotes/${quoteId}/blocks`, { method: 'POST', body: data }),
+  update: (blockId, data) => request(`/blocks/${blockId}`, { method: 'PATCH', body: data }),
+  delete: (blockId) => request(`/blocks/${blockId}`, { method: 'DELETE' }),
+  addMember: (blockId, productId) => request(`/blocks/${blockId}/members/${productId}`, { method: 'POST' }),
+  removeMember: (blockId, productId) => request(`/blocks/${blockId}/members/${productId}`, { method: 'DELETE' }),
+  updateMember: (blockId, productId, data) => request(`/blocks/${blockId}/members/${productId}`, { method: 'PATCH', body: data }),
 };
 
-// ── Labor Blocks ──
+// ── System Defaults ──
 
-export const laborBlocks = {
-  add: (productId, data) => request(`/products/${productId}/labor-blocks`, { method: 'POST', body: data }),
-  update: (productId, blockId, data) => request(`/products/${productId}/labor-blocks/${blockId}`, { method: 'PATCH', body: data }),
-  delete: (productId, blockId) => request(`/products/${productId}/labor-blocks/${blockId}`, { method: 'DELETE' }),
-};
-
-// ── Group Pools ──
-
-export const groupCostPools = {
-  create: (quoteId, data) => request(`/quotes/${quoteId}/group-cost-pools`, { method: 'POST', body: data }),
-  update: (poolId, data) => request(`/group-cost-pools/${poolId}`, { method: 'PATCH', body: data }),
-  delete: (poolId) => request(`/group-cost-pools/${poolId}`, { method: 'DELETE' }),
-  addMember: (poolId, productId) => request(`/group-cost-pools/${poolId}/members/${productId}`, { method: 'POST' }),
-  removeMember: (poolId, productId) => request(`/group-cost-pools/${poolId}/members/${productId}`, { method: 'DELETE' }),
-};
-
-export const groupLaborPools = {
-  create: (quoteId, data) => request(`/quotes/${quoteId}/group-labor-pools`, { method: 'POST', body: data }),
-  update: (poolId, data) => request(`/group-labor-pools/${poolId}`, { method: 'PATCH', body: data }),
-  delete: (poolId) => request(`/group-labor-pools/${poolId}`, { method: 'DELETE' }),
-  addMember: (poolId, productId) => request(`/group-labor-pools/${poolId}/members/${productId}`, { method: 'POST' }),
-  removeMember: (poolId, productId) => request(`/group-labor-pools/${poolId}/members/${productId}`, { method: 'DELETE' }),
+export const defaults = {
+  get: () => request('/defaults'),
+  update: (data) => request('/defaults', { method: 'PATCH', body: data }),
 };
 
 // ── Catalog & Context ──

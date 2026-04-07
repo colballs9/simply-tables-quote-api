@@ -1,5 +1,5 @@
 """
-SQLAlchemy ORM models — mirrors schema_v1.sql.
+SQLAlchemy ORM models — Phase 2 quote block architecture.
 
 All UUID primary keys use server-side gen_random_uuid().
 Computed fields (cost_pp, hours_pp, totals) are stored and
@@ -16,6 +16,33 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from .database import Base
+
+
+# ──────────────────────────────────────────────────────────────────────
+# System Defaults
+# ──────────────────────────────────────────────────────────────────────
+
+class SystemDefaults(Base):
+    __tablename__ = "system_defaults"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    hourly_rate: Mapped[float] = mapped_column(Numeric(8, 2), default=155.00)
+
+    # Margin rates
+    hardwood_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    stone_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
+    stock_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
+    stock_base_ship_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    powder_coat_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.10)
+    custom_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    unit_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    group_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    misc_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
+    consumables_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -81,6 +108,19 @@ class Quote(Base):
     sales_tax: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     budget_buffer_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
 
+    # Default rates/margins for new products (inherited from system_defaults at quote creation)
+    default_hourly_rate: Mapped[float] = mapped_column(Numeric(8, 2), default=155.00)
+    default_hardwood_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    default_stone_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
+    default_stock_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
+    default_stock_base_ship_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    default_powder_coat_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.10)
+    default_custom_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    default_unit_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    default_group_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
+    default_misc_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
+    default_consumables_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
+
     # Computed totals
     total_cost: Mapped[float | None] = mapped_column(Numeric(12, 2))
     total_price: Mapped[float | None] = mapped_column(Numeric(12, 2))
@@ -96,8 +136,8 @@ class Quote(Base):
     # Relationships
     options: Mapped[list["QuoteOption"]] = relationship(back_populates="quote", cascade="all, delete-orphan",
                                                          order_by="QuoteOption.sort_order")
-    group_cost_pools: Mapped[list["GroupCostPool"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
-    group_labor_pools: Mapped[list["GroupLaborPool"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
+    quote_blocks: Mapped[list["QuoteBlock"]] = relationship(back_populates="quote", cascade="all, delete-orphan",
+                                                             order_by="QuoteBlock.sort_order")
     species_assignments: Mapped[list["SpeciesAssignment"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
     stone_assignments: Mapped[list["StoneAssignment"]] = relationship(back_populates="quote", cascade="all, delete-orphan")
 
@@ -223,12 +263,9 @@ class Product(Base):
 
     # Relationships
     option: Mapped["QuoteOption"] = relationship(back_populates="products")
-    cost_blocks: Mapped[list["CostBlock"]] = relationship(back_populates="product", cascade="all, delete-orphan",
-                                                           order_by="CostBlock.sort_order")
-    labor_blocks: Mapped[list["LaborBlock"]] = relationship(back_populates="product", cascade="all, delete-orphan",
-                                                             order_by="LaborBlock.sort_order")
     components: Mapped[list["ProductComponent"]] = relationship(back_populates="product", cascade="all, delete-orphan",
                                                                 order_by="ProductComponent.sort_order")
+    block_memberships: Mapped[list["QuoteBlockMember"]] = relationship(back_populates="product", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_products_option", "option_id"),
@@ -237,174 +274,83 @@ class Product(Base):
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Cost Blocks
+# Quote Blocks (unified cost + labor blocks at quote level)
 # ──────────────────────────────────────────────────────────────────────
 
-class CostBlock(Base):
-    __tablename__ = "cost_blocks"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"))
-    tag_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tags.id"))
-
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    cost_category: Mapped[str] = mapped_column(String, nullable=False)
-
-    description: Mapped[str | None] = mapped_column(Text)
-    cost_per_unit: Mapped[float | None] = mapped_column(Numeric(12, 4))
-    units_per_product: Mapped[float] = mapped_column(Numeric(10, 4), default=1)
-    multiplier_type: Mapped[str] = mapped_column(String, default="per_unit")
-    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
-
-    # Computed
-    cost_pp: Mapped[float | None] = mapped_column(Numeric(12, 4))
-    cost_pt: Mapped[float | None] = mapped_column(Numeric(12, 4))
-
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    product: Mapped["Product"] = relationship(back_populates="cost_blocks")
-    tag: Mapped["Tag | None"] = relationship()
-
-    __table_args__ = (
-        Index("idx_cost_blocks_product", "product_id"),
-        Index("idx_cost_blocks_category", "cost_category"),
-    )
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Group Cost Pools
-# ──────────────────────────────────────────────────────────────────────
-
-class GroupCostPool(Base):
-    __tablename__ = "group_cost_pools"
+class QuoteBlock(Base):
+    __tablename__ = "quote_blocks"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     quote_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quotes.id", ondelete="CASCADE"))
     tag_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tags.id"))
 
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    cost_category: Mapped[str] = mapped_column(String, default="group_cost")
-
-    description: Mapped[str | None] = mapped_column(Text)
-    total_amount: Mapped[float] = mapped_column(Numeric(12, 4), nullable=False)
-    distribution_type: Mapped[str] = mapped_column(String, default="units")
-    on_qty_change: Mapped[str] = mapped_column(String, default="redistribute")
-
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    quote: Mapped["Quote"] = relationship(back_populates="group_cost_pools")
-    members: Mapped[list["GroupCostPoolMember"]] = relationship(back_populates="pool", cascade="all, delete-orphan")
-    tag: Mapped["Tag | None"] = relationship()
-
-
-class GroupCostPoolMember(Base):
-    __tablename__ = "group_cost_pool_members"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    pool_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("group_cost_pools.id", ondelete="CASCADE"))
-    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"))
-
-    # Computed
-    metric_value: Mapped[float | None] = mapped_column(Numeric(12, 4))
-    cost_pp: Mapped[float | None] = mapped_column(Numeric(12, 4))
-    cost_pt: Mapped[float | None] = mapped_column(Numeric(12, 4))
-
-    # Relationships
-    pool: Mapped["GroupCostPool"] = relationship(back_populates="members")
-
-    __table_args__ = (
-        UniqueConstraint("pool_id", "product_id"),
-    )
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Labor Blocks
-# ──────────────────────────────────────────────────────────────────────
-
-class LaborBlock(Base):
-    __tablename__ = "labor_blocks"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"))
-    tag_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tags.id"))
-
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    labor_center: Mapped[str] = mapped_column(String, nullable=False)
-    block_type: Mapped[str] = mapped_column(String, nullable=False)  # rate, unit, group
-
-    description: Mapped[str | None] = mapped_column(Text)
-
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
-
-    # Rate block
-    rate_value: Mapped[float | None] = mapped_column(Numeric(10, 4))
-    metric_source: Mapped[str | None] = mapped_column(String)
-    rate_type: Mapped[str] = mapped_column(String, default="metric")  # metric | units
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # Unit block
+    # Block classification
+    block_domain: Mapped[str] = mapped_column(String, nullable=False)  # cost | labor
+    block_type: Mapped[str] = mapped_column(String, nullable=False)    # rate | unit | group
+    label: Mapped[str | None] = mapped_column(String)
+
+    # Cost fields (block_domain = "cost")
+    cost_category: Mapped[str | None] = mapped_column(String)
+    cost_per_unit: Mapped[float | None] = mapped_column(Numeric(12, 4))
+    units_per_product: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    multiplier_type: Mapped[str | None] = mapped_column(String)
+
+    # Labor fields (block_domain = "labor")
+    labor_center: Mapped[str | None] = mapped_column(String)
+    rate_value: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    metric_source: Mapped[str | None] = mapped_column(String)
+    rate_type: Mapped[str | None] = mapped_column(String, default="metric")  # metric | units
     hours_per_unit: Mapped[float | None] = mapped_column(Numeric(10, 4))
 
-    # Computed
-    hours_pp: Mapped[float | None] = mapped_column(Numeric(10, 4))
-    hours_pt: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    # Group fields (block_type = "group")
+    total_amount: Mapped[float | None] = mapped_column(Numeric(12, 4))
+    total_hours: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    distribution_type: Mapped[str | None] = mapped_column(String)
+    on_qty_change: Mapped[str | None] = mapped_column(String, default="redistribute")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    product: Mapped["Product"] = relationship(back_populates="labor_blocks")
+    quote: Mapped["Quote"] = relationship(back_populates="quote_blocks")
     tag: Mapped["Tag | None"] = relationship()
+    members: Mapped[list["QuoteBlockMember"]] = relationship(back_populates="block", cascade="all, delete-orphan")
 
     __table_args__ = (
-        Index("idx_labor_blocks_product", "product_id"),
-        Index("idx_labor_blocks_lc", "labor_center"),
+        Index("idx_quote_blocks_quote", "quote_id"),
+        Index("idx_quote_blocks_domain", "block_domain"),
     )
 
 
-# ──────────────────────────────────────────────────────────────────────
-# Group Labor Pools
-# ──────────────────────────────────────────────────────────────────────
-
-class GroupLaborPool(Base):
-    __tablename__ = "group_labor_pools"
+class QuoteBlockMember(Base):
+    __tablename__ = "quote_block_members"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    quote_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quotes.id", ondelete="CASCADE"))
-    tag_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tags.id"))
-
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    labor_center: Mapped[str] = mapped_column(String, nullable=False)
-
-    description: Mapped[str | None] = mapped_column(Text)
-    total_hours: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False)
-    distribution_type: Mapped[str] = mapped_column(String, default="units")
-    on_qty_change: Mapped[str] = mapped_column(String, default="redistribute")
-
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    quote: Mapped["Quote"] = relationship(back_populates="group_labor_pools")
-    members: Mapped[list["GroupLaborPoolMember"]] = relationship(back_populates="pool", cascade="all, delete-orphan")
-    tag: Mapped["Tag | None"] = relationship()
-
-
-class GroupLaborPoolMember(Base):
-    __tablename__ = "group_labor_pool_members"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    pool_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("group_labor_pools.id", ondelete="CASCADE"))
+    quote_block_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quote_blocks.id", ondelete="CASCADE"))
     product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"))
 
-    metric_value: Mapped[float | None] = mapped_column(Numeric(12, 4))
+    # Per-member overrides (nullable = use block-level value)
+    description: Mapped[str | None] = mapped_column(Text)
+    hours_per_unit: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    cost_per_unit: Mapped[float | None] = mapped_column(Numeric(12, 4))
+    is_active: Mapped[bool | None] = mapped_column(Boolean)
+
+    # Computed by engine
+    cost_pp: Mapped[float | None] = mapped_column(Numeric(12, 4))
+    cost_pt: Mapped[float | None] = mapped_column(Numeric(12, 4))
     hours_pp: Mapped[float | None] = mapped_column(Numeric(10, 4))
     hours_pt: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    metric_value: Mapped[float | None] = mapped_column(Numeric(12, 4))
 
-    pool: Mapped["GroupLaborPool"] = relationship(back_populates="members")
+    # Relationships
+    block: Mapped["QuoteBlock"] = relationship(back_populates="members")
+    product: Mapped["Product"] = relationship(back_populates="block_memberships")
 
     __table_args__ = (
-        UniqueConstraint("pool_id", "product_id"),
+        UniqueConstraint("quote_block_id", "product_id"),
     )
 
 

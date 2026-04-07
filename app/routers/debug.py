@@ -84,8 +84,8 @@ async def debug_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db
     thickness_str = product_data.get("lumber_thickness") or ""
     raw_thickness = _f3(product_data.get("raw_thickness", 0))
     bd_ft = _f3(product_data.get("bd_ft", 0))
-    sq_ft = _f3(product_data.get("sq_ft", 0))        # DIA-adjusted (material cost)
-    sq_ft_wl = _f3(product_data.get("sq_ft_wl", sq_ft))  # W×L (pools + rate labor)
+    sq_ft = _f3(product_data.get("sq_ft", 0))
+    sq_ft_wl = _f3(product_data.get("sq_ft_wl", sq_ft))
     quarter_code = product_data.get("quarter_code") or ""
 
     # ── Dimensions ──────────────────────────────────────────────────────
@@ -118,166 +118,167 @@ async def debug_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db
         dimensions["sq_ft_dia"] = sq_ft
         dimensions["sq_ft_dia_note"] = (
             f"DIA-adjusted area used for per-sqft material cost blocks. "
-            f"W×L ({sq_ft_wl}) used for group pools and rate labor."
+            f"W×L ({sq_ft_wl}) used for group blocks and rate labor."
         )
 
-    # ── Unit cost blocks ─────────────────────────────────────────────────
+    # ── Quote blocks affecting this product ──────────────────────────────
     cost_blocks_debug = []
-    for block in product_data.get("cost_blocks", []):
-        cat = block.get("cost_category", "")
-        cpu = _f4(block.get("cost_per_unit") or 0)
-        mult_type = block.get("multiplier_type", "fixed")
-        cost_pp = _f2(block.get("cost_pp", 0))
-
-        if mult_type == "per_bdft":
-            formula = f"{cpu} × {bd_ft} bdft = {cost_pp}"
-            inputs = {"cost_per_bdft": cpu, "bd_ft": bd_ft}
-        elif mult_type == "per_sqft":
-            formula = f"{cpu} × {sq_ft} sqft = {cost_pp}"
-            inputs = {"cost_per_sqft": cpu, "sq_ft": sq_ft}
-        elif mult_type == "per_base":
-            formula = f"{cpu} × {bases_per_top} bases = {cost_pp}"
-            inputs = {"cost_per_base": cpu, "bases_per_top": bases_per_top}
-        else:  # fixed / units_per_product
-            units_pp = _f4(block.get("units_per_product") or 1)
-            formula = f"{cpu} × {units_pp} = {cost_pp}"
-            inputs = {"cost_per_unit": cpu, "units_per_product": units_pp}
-
-        margin_field = MARGIN_CATEGORY_MAP.get(cat, "unit_cost_margin_rate")
-        margin_rate = _f4(product_data.get(margin_field) or 0.05)
-        margin_pp = _f2(cost_pp * margin_rate)
-
-        cost_blocks_debug.append({
-            "id": block.get("id"),
-            "description": block.get("description"),
-            "category": cat,
-            "multiplier_type": mult_type,
-            "is_builtin": block.get("is_builtin", False),
-            "inputs": inputs,
-            "formula": formula,
-            "cost_pp": cost_pp,
-            "margin_rate": margin_rate,
-            "margin_pp": margin_pp,
-            "cost_with_margin": _f2(cost_pp + margin_pp),
-        })
-
-    # ── Group cost pool shares ────────────────────────────────────────────
-    group_pool_shares_debug = []
-    for pool in engine_result["group_cost_pools"]:
-        member_data = next(
-            (m for m in pool["members"] if m["product_id"] == pid), None
-        )
-        if not member_data:
-            continue
-
-        dist_type = pool.get("distribution_type", "units")
-        total_amount = _f2(pool.get("total_amount", 0))
-        metric_value = _f3(member_data.get("metric_value", 0))
-        cost_pp_val = _f2(member_data.get("cost_pp", 0))
-
-        total_metric = _f3(
-            sum(float(m.get("metric_value") or 0) for m in pool["members"])
-        )
-        rate = _f4(total_amount / total_metric if total_metric else 0)
-
-        if dist_type == "sqft":
-            metric_formula = f"{sq_ft_wl} sqft × {qty} qty = {metric_value}"
-        elif dist_type == "bdft":
-            metric_formula = f"{bd_ft} bdft × {qty} qty = {metric_value}"
-        else:
-            metric_formula = f"{qty} units"
-
-        group_pool_shares_debug.append({
-            "pool_id": pool.get("id"),
-            "pool_description": pool.get("description"),
-            "cost_category": pool.get("cost_category"),
-            "pool_total": total_amount,
-            "distribution_type": dist_type,
-            "this_product_metric": metric_value,
-            "this_product_metric_formula": metric_formula,
-            "total_metric_all_members": total_metric,
-            "rate": rate,
-            "rate_formula": f"{total_amount} / {total_metric} = {rate}",
-            "cost_pp": cost_pp_val,
-            "cost_pp_formula": f"({metric_value} / {qty}) × {rate} = {cost_pp_val}",
-        })
-
-    # ── Labor blocks ─────────────────────────────────────────────────────
+    group_cost_blocks_debug = []
     labor_blocks_debug = []
-    for block in product_data.get("labor_blocks", []):
-        block_type = block.get("block_type", "unit")
-        hours_pp = _f3(block.get("hours_pp", 0))
+    group_labor_blocks_debug = []
 
-        if block_type == "unit":
-            hours_pu = _f3(block.get("hours_per_unit") or 0)
-            formula = f"{hours_pu} hrs/unit = {hours_pp} hrs PP"
-            inputs = {"hours_per_unit": hours_pu}
-        elif block_type == "rate":
-            rate_value = _f4(block.get("rate_value") or 0)
-            metric_source = block.get("metric_source", "top_sqft")
-            if metric_source in ("top_sqft", "panel_sqft"):
-                metric = sq_ft_wl
-                metric_label = "sqft"
-            elif metric_source == "bd_ft":
-                metric = bd_ft
-                metric_label = "bdft"
-            else:
-                metric = sq_ft_wl
-                metric_label = "sqft"
-            formula = f"{metric} {metric_label} / {rate_value} {metric_label}/hr = {hours_pp} hrs PP"
-            inputs = {metric_label: metric, "rate_per_hr": rate_value}
-        else:
-            formula = "group type — see group_labor_pool_shares"
-            inputs = {}
+    for block in engine_result.get("quote_blocks", []):
+        domain = block.get("block_domain", "cost")
+        btype = block.get("block_type", "unit")
 
-        labor_blocks_debug.append({
-            "id": block.get("id"),
-            "labor_center": block.get("labor_center"),
-            "description": block.get("description"),
-            "block_type": block_type,
-            "is_builtin": block.get("is_builtin", False),
-            "inputs": inputs,
-            "formula": formula,
-            "hours_pp": hours_pp,
-        })
-
-    # ── Group labor pool shares ───────────────────────────────────────────
-    group_labor_shares_debug = []
-    for pool in engine_result["group_labor_pools"]:
+        # Find this product's member in the block
         member_data = next(
-            (m for m in pool["members"] if m["product_id"] == pid), None
+            (m for m in block.get("members", []) if m["product_id"] == pid), None
         )
         if not member_data:
             continue
 
-        dist_type = pool.get("distribution_type", "units")
-        total_hours_pool = _f3(pool.get("total_hours", 0))
-        metric_value = _f3(member_data.get("metric_value", 0))
-        hours_pp_val = _f3(member_data.get("hours_pp", 0))
-        total_metric = _f3(
-            sum(float(m.get("metric_value") or 0) for m in pool["members"])
-        )
-        rate = _f4(total_hours_pool / total_metric if total_metric else 0)
+        if domain == "cost":
+            if btype == "group":
+                # Group cost block
+                dist_type = block.get("distribution_type", "units")
+                total_amount = _f2(block.get("total_amount", 0))
+                metric_value = _f3(member_data.get("metric_value", 0))
+                cost_pp_val = _f2(member_data.get("cost_pp", 0))
 
-        if dist_type == "sqft":
-            metric_formula = f"{sq_ft_wl} sqft × {qty} qty = {metric_value}"
-        elif dist_type == "bdft":
-            metric_formula = f"{bd_ft} bdft × {qty} qty = {metric_value}"
-        else:
-            metric_formula = f"{qty} units"
+                total_metric = _f3(
+                    sum(float(m.get("metric_value") or 0) for m in block["members"])
+                )
+                rate = _f4(total_amount / total_metric if total_metric else 0)
 
-        group_labor_shares_debug.append({
-            "pool_id": pool.get("id"),
-            "labor_center": pool.get("labor_center"),
-            "pool_total_hours": total_hours_pool,
-            "distribution_type": dist_type,
-            "this_product_metric": metric_value,
-            "this_product_metric_formula": metric_formula,
-            "total_metric_all_members": total_metric,
-            "rate": rate,
-            "hours_pp": hours_pp_val,
-            "hours_pp_formula": f"({metric_value} / {qty}) × {rate} = {hours_pp_val}",
-        })
+                if dist_type == "sqft":
+                    metric_formula = f"{sq_ft_wl} sqft × {qty} qty = {metric_value}"
+                elif dist_type == "bdft":
+                    metric_formula = f"{bd_ft} bdft × {qty} qty = {metric_value}"
+                else:
+                    metric_formula = f"{qty} units"
+
+                group_cost_blocks_debug.append({
+                    "block_id": block.get("id"),
+                    "label": block.get("label"),
+                    "cost_category": block.get("cost_category"),
+                    "total_amount": total_amount,
+                    "distribution_type": dist_type,
+                    "this_product_metric": metric_value,
+                    "this_product_metric_formula": metric_formula,
+                    "total_metric_all_members": total_metric,
+                    "rate": rate,
+                    "rate_formula": f"{total_amount} / {total_metric} = {rate}",
+                    "cost_pp": cost_pp_val,
+                    "cost_pp_formula": f"({metric_value} / {qty}) × {rate} = {cost_pp_val}",
+                })
+            else:
+                # Unit cost block
+                cat = block.get("cost_category", "")
+                cpu = _f4(member_data.get("cost_per_unit") or block.get("cost_per_unit") or 0)
+                mult_type = block.get("multiplier_type", "per_unit")
+                cost_pp = _f2(member_data.get("cost_pp", 0))
+
+                if mult_type == "per_bdft":
+                    formula = f"{cpu} × {bd_ft} bdft = {cost_pp}"
+                    inputs = {"cost_per_bdft": cpu, "bd_ft": bd_ft}
+                elif mult_type == "per_sqft":
+                    formula = f"{cpu} × {sq_ft} sqft = {cost_pp}"
+                    inputs = {"cost_per_sqft": cpu, "sq_ft": sq_ft}
+                elif mult_type == "per_base":
+                    formula = f"{cpu} × {bases_per_top} bases = {cost_pp}"
+                    inputs = {"cost_per_base": cpu, "bases_per_top": bases_per_top}
+                else:
+                    units_pp = _f4(block.get("units_per_product") or 1)
+                    formula = f"{cpu} × {units_pp} = {cost_pp}"
+                    inputs = {"cost_per_unit": cpu, "units_per_product": units_pp}
+
+                margin_field = MARGIN_CATEGORY_MAP.get(cat, "unit_cost_margin_rate")
+                margin_rate = _f4(product_data.get(margin_field) or 0.05)
+                margin_pp = _f2(cost_pp * margin_rate)
+
+                cost_blocks_debug.append({
+                    "block_id": block.get("id"),
+                    "label": block.get("label"),
+                    "category": cat,
+                    "multiplier_type": mult_type,
+                    "is_builtin": block.get("is_builtin", False),
+                    "inputs": inputs,
+                    "formula": formula,
+                    "cost_pp": cost_pp,
+                    "margin_rate": margin_rate,
+                    "margin_pp": margin_pp,
+                    "cost_with_margin": _f2(cost_pp + margin_pp),
+                })
+
+        elif domain == "labor":
+            if btype == "group":
+                # Group labor block
+                dist_type = block.get("distribution_type", "units")
+                total_hours_block = _f3(block.get("total_hours", 0))
+                metric_value = _f3(member_data.get("metric_value", 0))
+                hours_pp_val = _f3(member_data.get("hours_pp", 0))
+                total_metric = _f3(
+                    sum(float(m.get("metric_value") or 0) for m in block["members"])
+                )
+                rate = _f4(total_hours_block / total_metric if total_metric else 0)
+
+                if dist_type == "sqft":
+                    metric_formula = f"{sq_ft_wl} sqft × {qty} qty = {metric_value}"
+                elif dist_type == "bdft":
+                    metric_formula = f"{bd_ft} bdft × {qty} qty = {metric_value}"
+                else:
+                    metric_formula = f"{qty} units"
+
+                group_labor_blocks_debug.append({
+                    "block_id": block.get("id"),
+                    "label": block.get("label"),
+                    "labor_center": block.get("labor_center"),
+                    "total_hours": total_hours_block,
+                    "distribution_type": dist_type,
+                    "this_product_metric": metric_value,
+                    "this_product_metric_formula": metric_formula,
+                    "total_metric_all_members": total_metric,
+                    "rate": rate,
+                    "hours_pp": hours_pp_val,
+                    "hours_pp_formula": f"({metric_value} / {qty}) × {rate} = {hours_pp_val}",
+                })
+            else:
+                # Rate or unit labor block
+                hours_pp = _f3(member_data.get("hours_pp", 0))
+
+                if btype == "unit":
+                    hours_pu = _f3(member_data.get("hours_per_unit") or block.get("hours_per_unit") or 0)
+                    formula = f"{hours_pu} hrs/unit = {hours_pp} hrs PP"
+                    inputs = {"hours_per_unit": hours_pu}
+                elif btype == "rate":
+                    rate_value = _f4(block.get("rate_value") or 0)
+                    metric_source = block.get("metric_source", "top_sqft")
+                    if metric_source in ("top_sqft", "panel_sqft"):
+                        metric = sq_ft_wl
+                        metric_label = "sqft"
+                    elif metric_source == "bd_ft":
+                        metric = bd_ft
+                        metric_label = "bdft"
+                    else:
+                        metric = sq_ft_wl
+                        metric_label = "sqft"
+                    formula = f"{metric} {metric_label} / {rate_value} {metric_label}/hr = {hours_pp} hrs PP"
+                    inputs = {metric_label: metric, "rate_per_hr": rate_value}
+                else:
+                    formula = "unknown block type"
+                    inputs = {}
+
+                labor_blocks_debug.append({
+                    "block_id": block.get("id"),
+                    "label": block.get("label"),
+                    "labor_center": block.get("labor_center"),
+                    "block_type": btype,
+                    "is_builtin": block.get("is_builtin", False),
+                    "inputs": inputs,
+                    "formula": formula,
+                    "hours_pp": hours_pp,
+                })
 
     # ── Pricing assembly ──────────────────────────────────────────────────
     margin_detail_raw = product_data.get("margin_detail", {})
@@ -331,8 +332,8 @@ async def debug_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db
         "quantity": qty,
         "dimensions": dimensions,
         "cost_blocks": cost_blocks_debug,
-        "group_pool_shares": group_pool_shares_debug,
+        "group_cost_blocks": group_cost_blocks_debug,
         "labor_blocks": labor_blocks_debug,
-        "group_labor_pool_shares": group_labor_shares_debug,
+        "group_labor_blocks": group_labor_blocks_debug,
         "pricing_assembly": pricing_assembly,
     }

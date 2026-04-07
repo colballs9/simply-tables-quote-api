@@ -16,6 +16,41 @@ from typing import Optional
 
 
 # ──────────────────────────────────────────────────────────────────────
+# System Defaults
+# ──────────────────────────────────────────────────────────────────────
+
+class SystemDefaultsRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    key: str
+    hourly_rate: float
+    hardwood_margin_rate: float
+    stone_margin_rate: float
+    stock_base_margin_rate: float
+    stock_base_ship_margin_rate: float
+    powder_coat_margin_rate: float
+    custom_base_margin_rate: float
+    unit_cost_margin_rate: float
+    group_cost_margin_rate: float
+    misc_margin_rate: float
+    consumables_margin_rate: float
+
+
+class SystemDefaultsUpdate(BaseModel):
+    hourly_rate: Optional[float] = None
+    hardwood_margin_rate: Optional[float] = None
+    stone_margin_rate: Optional[float] = None
+    stock_base_margin_rate: Optional[float] = None
+    stock_base_ship_margin_rate: Optional[float] = None
+    powder_coat_margin_rate: Optional[float] = None
+    custom_base_margin_rate: Optional[float] = None
+    unit_cost_margin_rate: Optional[float] = None
+    group_cost_margin_rate: Optional[float] = None
+    misc_margin_rate: Optional[float] = None
+    consumables_margin_rate: Optional[float] = None
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Tags
 # ──────────────────────────────────────────────────────────────────────
 
@@ -80,190 +115,117 @@ class ComponentRead(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Cost Blocks
+# Quote Block Members
 # ──────────────────────────────────────────────────────────────────────
 
-class CostBlockCreate(BaseModel):
+class QuoteBlockMemberRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    quote_block_id: uuid.UUID
+    product_id: uuid.UUID
+    # Per-member overrides
+    description: Optional[str] = None
+    hours_per_unit: Optional[float] = None
+    cost_per_unit: Optional[float] = None
+    is_active: Optional[bool] = None
+    # Computed
+    cost_pp: Optional[float] = None
+    cost_pt: Optional[float] = None
+    hours_pp: Optional[float] = None
+    hours_pt: Optional[float] = None
+    metric_value: Optional[float] = None
+
+
+class QuoteBlockMemberUpdate(BaseModel):
+    description: Optional[str] = None
+    hours_per_unit: Optional[float] = None
+    cost_per_unit: Optional[float] = None
+    is_active: Optional[bool] = None
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Quote Blocks
+# ──────────────────────────────────────────────────────────────────────
+
+class QuoteBlockCreate(BaseModel):
     tag_id: Optional[uuid.UUID] = None
     sort_order: int = 0
-    cost_category: str
-    description: Optional[str] = None
-    cost_per_unit: Optional[float] = None
-    units_per_product: float = 1
-    multiplier_type: str = "per_unit"
-
-
-class CostBlockUpdate(BaseModel):
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: Optional[int] = None
+    is_active: bool = True
+    block_domain: str          # cost | labor
+    block_type: str            # rate | unit | group
+    label: Optional[str] = None
+    # Cost fields
     cost_category: Optional[str] = None
-    description: Optional[str] = None
     cost_per_unit: Optional[float] = None
     units_per_product: Optional[float] = None
     multiplier_type: Optional[str] = None
-
-
-class CostBlockRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    product_id: uuid.UUID
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: int
-    cost_category: str
-    description: Optional[str] = None
-    cost_per_unit: Optional[float] = None
-    units_per_product: float
-    multiplier_type: str
-    is_builtin: bool = False
-    cost_pp: Optional[float] = None
-    cost_pt: Optional[float] = None
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Labor Blocks
-# ──────────────────────────────────────────────────────────────────────
-
-class LaborBlockCreate(BaseModel):
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: int = 0
-    labor_center: str
-    block_type: str  # rate, unit
-    description: Optional[str] = None
-    rate_value: Optional[float] = None
-    metric_source: Optional[str] = None
-    rate_type: Optional[str] = None  # metric (default) | units (LC104 pattern)
-    is_active: bool = True
-    hours_per_unit: Optional[float] = None
-
-
-class LaborBlockUpdate(BaseModel):
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: Optional[int] = None
+    # Labor fields
     labor_center: Optional[str] = None
-    block_type: Optional[str] = None
-    description: Optional[str] = None
     rate_value: Optional[float] = None
     metric_source: Optional[str] = None
     rate_type: Optional[str] = None
-    is_active: Optional[bool] = None
     hours_per_unit: Optional[float] = None
-
-
-class LaborBlockRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    product_id: uuid.UUID
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: int
-    labor_center: str
-    block_type: str
-    description: Optional[str] = None
-    rate_value: Optional[float] = None
-    metric_source: Optional[str] = None
-    rate_type: str = "metric"
-    is_active: bool
-    is_builtin: bool = False
-    hours_per_unit: Optional[float] = None
-    hours_pp: Optional[float] = None
-    hours_pt: Optional[float] = None
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Group Cost Pools
-# ──────────────────────────────────────────────────────────────────────
-
-class GroupCostPoolMemberRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    pool_id: uuid.UUID
-    product_id: uuid.UUID
-    metric_value: Optional[float] = None
-    cost_pp: Optional[float] = None
-    cost_pt: Optional[float] = None
-
-
-class GroupCostPoolCreate(BaseModel):
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: int = 0
-    cost_category: str = "group_cost"
-    description: Optional[str] = None
-    total_amount: float
-    distribution_type: str = "units"
-    on_qty_change: str = "redistribute"
-    product_ids: list[uuid.UUID] = []  # products to include
-
-
-class GroupCostPoolUpdate(BaseModel):
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: Optional[int] = None
-    cost_category: Optional[str] = None
-    description: Optional[str] = None
+    # Group fields
     total_amount: Optional[float] = None
+    total_hours: Optional[float] = None
     distribution_type: Optional[str] = None
-    on_qty_change: Optional[str] = None
-
-
-class GroupCostPoolRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    quote_id: uuid.UUID
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: int
-    cost_category: str
-    description: Optional[str] = None
-    total_amount: float
-    distribution_type: str
-    on_qty_change: str
-    members: list[GroupCostPoolMemberRead] = []
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Group Labor Pools
-# ──────────────────────────────────────────────────────────────────────
-
-class GroupLaborPoolMemberRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    pool_id: uuid.UUID
-    product_id: uuid.UUID
-    metric_value: Optional[float] = None
-    hours_pp: Optional[float] = None
-    hours_pt: Optional[float] = None
-
-
-class GroupLaborPoolCreate(BaseModel):
-    tag_id: Optional[uuid.UUID] = None
-    sort_order: int = 0
-    labor_center: str
-    description: Optional[str] = None
-    total_hours: float
-    distribution_type: str = "units"
     on_qty_change: str = "redistribute"
+    # Initial member product IDs
     product_ids: list[uuid.UUID] = []
 
 
-class GroupLaborPoolUpdate(BaseModel):
+class QuoteBlockUpdate(BaseModel):
     tag_id: Optional[uuid.UUID] = None
     sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+    label: Optional[str] = None
+    # Cost fields
+    cost_category: Optional[str] = None
+    cost_per_unit: Optional[float] = None
+    units_per_product: Optional[float] = None
+    multiplier_type: Optional[str] = None
+    # Labor fields
     labor_center: Optional[str] = None
-    description: Optional[str] = None
+    rate_value: Optional[float] = None
+    metric_source: Optional[str] = None
+    rate_type: Optional[str] = None
+    hours_per_unit: Optional[float] = None
+    # Group fields
+    total_amount: Optional[float] = None
     total_hours: Optional[float] = None
     distribution_type: Optional[str] = None
     on_qty_change: Optional[str] = None
 
 
-class GroupLaborPoolRead(BaseModel):
+class QuoteBlockRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     quote_id: uuid.UUID
     tag_id: Optional[uuid.UUID] = None
     sort_order: int
-    labor_center: str
-    description: Optional[str] = None
-    total_hours: float
-    distribution_type: str
-    on_qty_change: str
-    members: list[GroupLaborPoolMemberRead] = []
+    is_builtin: bool
+    is_active: bool
+    block_domain: str
+    block_type: str
+    label: Optional[str] = None
+    # Cost fields
+    cost_category: Optional[str] = None
+    cost_per_unit: Optional[float] = None
+    units_per_product: Optional[float] = None
+    multiplier_type: Optional[str] = None
+    # Labor fields
+    labor_center: Optional[str] = None
+    rate_value: Optional[float] = None
+    metric_source: Optional[str] = None
+    rate_type: Optional[str] = None
+    hours_per_unit: Optional[float] = None
+    # Group fields
+    total_amount: Optional[float] = None
+    total_hours: Optional[float] = None
+    distribution_type: Optional[str] = None
+    on_qty_change: Optional[str] = None
+    # Members
+    members: list[QuoteBlockMemberRead] = []
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -294,7 +256,7 @@ class ProductCreate(BaseModel):
     sheen: Optional[str] = None
     notes: Optional[str] = None
     bases_per_top: int = 1
-    hourly_rate: float = 155.00
+    hourly_rate: Optional[float] = None  # None = inherit from quote defaults
     final_adjustment_rate: float = 1.0
 
 
@@ -388,8 +350,6 @@ class ProductRead(BaseModel):
     sale_price_total: Optional[float] = None
     # Nested
     components: list[ComponentRead] = []
-    cost_blocks: list[CostBlockRead] = []
-    labor_blocks: list[LaborBlockRead] = []
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -484,6 +444,18 @@ class QuoteUpdate(BaseModel):
     status: Optional[str] = None
     drive_folder_id: Optional[str] = None
     shipping: Optional[float] = None
+    # Quote-level default overrides
+    default_hourly_rate: Optional[float] = None
+    default_hardwood_margin_rate: Optional[float] = None
+    default_stone_margin_rate: Optional[float] = None
+    default_stock_base_margin_rate: Optional[float] = None
+    default_stock_base_ship_margin_rate: Optional[float] = None
+    default_powder_coat_margin_rate: Optional[float] = None
+    default_custom_base_margin_rate: Optional[float] = None
+    default_unit_cost_margin_rate: Optional[float] = None
+    default_group_cost_margin_rate: Optional[float] = None
+    default_misc_margin_rate: Optional[float] = None
+    default_consumables_margin_rate: Optional[float] = None
 
 
 class QuoteSummary(BaseModel):
@@ -516,6 +488,19 @@ class QuoteRead(BaseModel):
     rep_rate: float
     status: str
     shipping: float = 0.0
+    # Default rates/margins
+    default_hourly_rate: float = 155.00
+    default_hardwood_margin_rate: float = 0.05
+    default_stone_margin_rate: float = 0.25
+    default_stock_base_margin_rate: float = 0.25
+    default_stock_base_ship_margin_rate: float = 0.05
+    default_powder_coat_margin_rate: float = 0.10
+    default_custom_base_margin_rate: float = 0.05
+    default_unit_cost_margin_rate: float = 0.05
+    default_group_cost_margin_rate: float = 0.05
+    default_misc_margin_rate: float = 0.00
+    default_consumables_margin_rate: float = 0.00
+    # Computed
     total_cost: Optional[float] = None
     total_price: Optional[float] = None
     total_hours: Optional[float] = None
@@ -523,8 +508,7 @@ class QuoteRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     options: list[QuoteOptionRead] = []
-    group_cost_pools: list[GroupCostPoolRead] = []
-    group_labor_pools: list[GroupLaborPoolRead] = []
+    quote_blocks: list[QuoteBlockRead] = []
     stone_assignments: list[StoneAssignmentRead] = []
 
 

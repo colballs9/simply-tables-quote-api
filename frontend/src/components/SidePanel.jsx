@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
-import { quotes as quotesApi, groupCostPools, groupLaborPools } from '../api/client'
+import { useState, useEffect, useRef } from 'react'
+import { ChevronDown, ChevronRight, X } from 'lucide-react'
+import { quotes as quotesApi, products as productsApi } from '../api/client'
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -11,25 +11,17 @@ const LC_LABELS = {
   LC109: 'Finishing', LC110: 'Assembly', LC111: 'Packing',
 }
 
-const COST_CATEGORIES = [
-  { value: 'misc', label: 'Misc' },
-  { value: 'consumables', label: 'Consumables' },
-  { value: 'stock_base_shipping', label: 'SB Shipping' },
-  { value: 'unit_cost', label: 'Unit Cost' },
-  { value: 'group_cost', label: 'Group Cost' },
-  { value: 'species', label: 'Species' },
-  { value: 'stone', label: 'Stone' },
-  { value: 'stock_base', label: 'Stock Base' },
-  { value: 'powder_coat', label: 'Powder Coat' },
-  { value: 'custom_base', label: 'Custom Base' },
-]
-
-const LABOR_CENTERS = Object.entries(LC_LABELS).map(([v, l]) => ({ value: v, label: `${v} – ${l}` }))
-
-const DIST_OPTIONS = [
-  { value: 'units', label: 'By Units' },
-  { value: 'sqft', label: 'By Sq Ft' },
-  { value: 'bdft', label: 'By Bd Ft' },
+const MARGIN_FIELDS = [
+  { key: 'hardwood_margin_rate', label: 'Hardwood' },
+  { key: 'stone_margin_rate', label: 'Stone' },
+  { key: 'stock_base_margin_rate', label: 'Stock Base' },
+  { key: 'stock_base_ship_margin_rate', label: 'SB Shipping' },
+  { key: 'powder_coat_margin_rate', label: 'Powder Coat' },
+  { key: 'custom_base_margin_rate', label: 'Custom Base' },
+  { key: 'unit_cost_margin_rate', label: 'Unit Cost' },
+  { key: 'group_cost_margin_rate', label: 'Group Cost' },
+  { key: 'misc_margin_rate', label: 'Misc' },
+  { key: 'consumables_margin_rate', label: 'Consumables' },
 ]
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -47,6 +39,11 @@ function fmtH(val) {
 function fmtRate(val) {
   if (val == null) return '—'
   return '$' + Number(val).toFixed(2) + '/hr'
+}
+
+function pct(val) {
+  if (val == null) return ''
+  return (Number(val) * 100).toFixed(1)
 }
 
 // ── Sub-components ───────────────────────────────────────────────────
@@ -68,220 +65,103 @@ function SummaryRow({ label, value, indent = false, accent, muted }) {
   )
 }
 
-function SectionHeader({ title, children }) {
-  return (
-    <div className="sp-section-header">
-      <span className="sp-section-title">{title}</span>
-      {children}
-    </div>
-  )
-}
-
-function PoolCard({ pool, type, productList, onUpdate, onDelete }) {
-  const [localAmount, setLocalAmount] = useState(
-    type === 'cost' ? String(pool.total_amount ?? '') : String(pool.total_hours ?? '')
-  )
+function ProductRateEditor({ product, optionId, onQuoteUpdate, onClose }) {
   const [saving, setSaving] = useState(false)
+  const [localRate, setLocalRate] = useState(String(product.hourly_rate ?? 155))
+  const [localAdj, setLocalAdj] = useState(String(product.final_adjustment_rate ?? 1))
+  const [localMargins, setLocalMargins] = useState(() => {
+    const m = {}
+    MARGIN_FIELDS.forEach(f => { m[f.key] = pct(product[f.key]) })
+    return m
+  })
+  const focusRef = useRef(null)
 
-  // Sync if pool changes from outside
-  useEffect(() => {
-    setLocalAmount(type === 'cost' ? String(pool.total_amount ?? '') : String(pool.total_hours ?? ''))
-  }, [pool.total_amount, pool.total_hours, type])
+  // Sync from props only when product identity changes or when not focused
+  const prevProductIdRef = useRef(product.id)
+  if (product.id !== prevProductIdRef.current) {
+    prevProductIdRef.current = product.id
+    setLocalRate(String(product.hourly_rate ?? 155))
+    setLocalAdj(String(product.final_adjustment_rate ?? 1))
+    const m = {}
+    MARGIN_FIELDS.forEach(f => { m[f.key] = pct(product[f.key]) })
+    setLocalMargins(m)
+  }
 
-  const memberIds = new Set((pool.members || []).map(m => m.product_id))
-  const api = type === 'cost' ? groupCostPools : groupLaborPools
-  const amountField = type === 'cost' ? 'total_amount' : 'total_hours'
-
-  async function saveAmount() {
-    const num = parseFloat(localAmount)
-    if (isNaN(num)) return
+  async function saveField(field, value) {
     setSaving(true)
     try {
-      const updated = await api.update(pool.id, { [amountField]: num })
-      onUpdate(updated)
+      const updated = await productsApi.update(optionId, product.id, { [field]: value })
+      onQuoteUpdate(updated)
     } catch (e) { console.error(e) }
     setSaving(false)
   }
 
-  async function handleDistChange(e) {
-    try {
-      const updated = await api.update(pool.id, { distribution_type: e.target.value })
-      onUpdate(updated)
-    } catch (e) { console.error(e) }
+  function handleRateBlur() {
+    const v = parseFloat(localRate)
+    if (!isNaN(v) && v !== product.hourly_rate) saveField('hourly_rate', v)
   }
 
-  async function toggleMember(productId) {
-    const isMember = memberIds.has(productId)
-    try {
-      const updated = isMember
-        ? await api.removeMember(pool.id, productId)
-        : await api.addMember(pool.id, productId)
-      onUpdate(updated)
-    } catch (e) { console.error(e) }
+  function handleAdjBlur() {
+    const v = parseFloat(localAdj)
+    if (!isNaN(v) && v !== product.final_adjustment_rate) saveField('final_adjustment_rate', v)
   }
 
-  const label = type === 'cost'
-    ? (pool.description || pool.cost_category || 'Cost Pool')
-    : (pool.description || `${pool.labor_center} – ${LC_LABELS[pool.labor_center] || ''}`)
+  function handleMarginBlur(key) {
+    const pctVal = parseFloat(localMargins[key])
+    if (isNaN(pctVal)) return
+    const rate = pctVal / 100
+    if (rate !== product[key]) saveField(key, rate)
+  }
 
   return (
-    <div className="sp-pool-card">
-      <div className="sp-pool-header">
-        <span className="sp-pool-label">{label}</span>
-        <button className="sp-icon-btn sp-icon-btn--danger" onClick={() => onDelete(pool.id)} title="Delete pool">
-          <Trash2 size={12} />
+    <div className="canvas-panel">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div className="canvas-panel-title" style={{ margin: 0 }}>
+          {product.title || 'Untitled'} — Rates
+        </div>
+        <button className="sp-icon-btn" onClick={onClose} title="Close">
+          <X size={14} />
         </button>
       </div>
 
-      <div className="sp-pool-fields">
+      <div className="sp-pool-fields" style={{ marginBottom: 12 }}>
         <div className="sp-pool-field">
-          <label>{type === 'cost' ? 'Total $' : 'Total hrs'}</label>
+          <label>Hourly Rate</label>
           <input
-            type="number"
-            step={type === 'cost' ? '1' : '0.25'}
-            value={localAmount}
-            onChange={e => setLocalAmount(e.target.value)}
-            onBlur={saveAmount}
+            type="number" step="5"
+            value={localRate}
+            onChange={e => setLocalRate(e.target.value)}
+            onBlur={handleRateBlur}
             disabled={saving}
           />
         </div>
         <div className="sp-pool-field">
-          <label>Distribute by</label>
-          <select value={pool.distribution_type || 'units'} onChange={handleDistChange}>
-            {DIST_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="sp-pool-members">
-        {productList.map(p => (
-          <label key={p.id} className="sp-member-row">
-            <input
-              type="checkbox"
-              checked={memberIds.has(p.id)}
-              onChange={() => toggleMember(p.id)}
-            />
-            <span>{p.title || p.id.slice(0, 8)}</span>
-            {memberIds.has(p.id) && (
-              <span className="sp-member-share">
-                {type === 'cost'
-                  ? (pool.members?.find(m => m.product_id === p.id)?.cost_pp != null
-                      ? `$${Number(pool.members.find(m => m.product_id === p.id).cost_pp).toFixed(2)}`
-                      : '')
-                  : (pool.members?.find(m => m.product_id === p.id)?.hours_pp != null
-                      ? `${Number(pool.members.find(m => m.product_id === p.id).hours_pp).toFixed(2)}h`
-                      : '')}
-              </span>
-            )}
-          </label>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function NewPoolForm({ type, productList, quoteId, onCreated, onCancel }) {
-  const [form, setForm] = useState(
-    type === 'cost'
-      ? { description: '', cost_category: 'misc', total_amount: '', distribution_type: 'sqft' }
-      : { description: '', labor_center: 'LC100', total_hours: '', distribution_type: 'units' }
-  )
-  const [selectedIds, setSelectedIds] = useState(new Set())
-  const [saving, setSaving] = useState(false)
-  const api = type === 'cost' ? groupCostPools : groupLaborPools
-
-  function toggleProduct(id) {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  async function handleCreate() {
-    const amount = type === 'cost' ? parseFloat(form.total_amount) : parseFloat(form.total_hours)
-    if (isNaN(amount) || amount <= 0) return
-    setSaving(true)
-    try {
-      const payload = {
-        ...form,
-        [type === 'cost' ? 'total_amount' : 'total_hours']: amount,
-        product_ids: [...selectedIds],
-        on_qty_change: 'redistribute',
-      }
-      const updated = await api.create(quoteId, payload)
-      onCreated(updated)
-    } catch (e) { console.error(e) }
-    setSaving(false)
-  }
-
-  return (
-    <div className="sp-new-pool-form">
-      <div className="sp-pool-fields">
-        <div className="sp-pool-field" style={{ flexBasis: '100%' }}>
-          <label>Description</label>
+          <label>Adjustment</label>
           <input
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder={type === 'cost' ? 'e.g. Misc Supplies' : 'e.g. LC100 Handling'}
+            type="number" step="0.05"
+            value={localAdj}
+            onChange={e => setLocalAdj(e.target.value)}
+            onBlur={handleAdjBlur}
+            disabled={saving}
           />
         </div>
-        {type === 'cost' ? (
-          <div className="sp-pool-field">
-            <label>Category</label>
-            <select value={form.cost_category} onChange={e => setForm(f => ({ ...f, cost_category: e.target.value }))}>
-              {COST_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-          </div>
-        ) : (
-          <div className="sp-pool-field">
-            <label>Labor Center</label>
-            <select value={form.labor_center} onChange={e => setForm(f => ({ ...f, labor_center: e.target.value }))}>
-              {LABOR_CENTERS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-          </div>
-        )}
-        <div className="sp-pool-field">
-          <label>{type === 'cost' ? 'Total $' : 'Total hrs'}</label>
-          <input
-            type="number"
-            step={type === 'cost' ? '1' : '0.25'}
-            value={type === 'cost' ? form.total_amount : form.total_hours}
-            onChange={e => setForm(f => ({
-              ...f,
-              [type === 'cost' ? 'total_amount' : 'total_hours']: e.target.value
-            }))}
-            placeholder="0"
-          />
-        </div>
-        <div className="sp-pool-field">
-          <label>Distribute by</label>
-          <select value={form.distribution_type} onChange={e => setForm(f => ({ ...f, distribution_type: e.target.value }))}>
-            {DIST_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
       </div>
 
-      <div className="sp-pool-members">
-        {productList.map(p => (
-          <label key={p.id} className="sp-member-row">
+      <div className="canvas-panel-title">Margin Rates (%)</div>
+      <div className="sp-margin-grid">
+        {MARGIN_FIELDS.map(f => (
+          <div key={f.key} className="sp-margin-row">
+            <span className="sp-margin-label">{f.label}</span>
             <input
-              type="checkbox"
-              checked={selectedIds.has(p.id)}
-              onChange={() => toggleProduct(p.id)}
+              className="sp-margin-input"
+              type="number" step="0.5"
+              value={localMargins[f.key]}
+              onChange={e => setLocalMargins(m => ({ ...m, [f.key]: e.target.value }))}
+              onBlur={() => handleMarginBlur(f.key)}
+              disabled={saving}
             />
-            <span>{p.title || p.id.slice(0, 8)}</span>
-          </label>
+          </div>
         ))}
-      </div>
-
-      <div className="sp-new-pool-actions">
-        <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={saving}>
-          {saving ? 'Creating...' : 'Create'}
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={onCancel} disabled={saving}>
-          Cancel
-        </button>
       </div>
     </div>
   )
@@ -289,18 +169,15 @@ function NewPoolForm({ type, productList, quoteId, onCreated, onCancel }) {
 
 // ── Main SidePanel ───────────────────────────────────────────────────
 
-export default function SidePanel({ quote, activeOption, onOptionSelect, onQuoteUpdate }) {
+export default function SidePanel({ quote, activeOption, onOptionSelect, onQuoteUpdate, selectedProductId, onProductDeselect }) {
   const [summary, setSummary] = useState(null)
   const [laborExpanded, setLaborExpanded] = useState(true)
-  const [addingCostPool, setAddingCostPool] = useState(false)
-  const [addingLaborPool, setAddingLaborPool] = useState(false)
   const [shippingSaving, setShippingSaving] = useState(false)
   const [localShipping, setLocalShipping] = useState(String(quote?.shipping ?? '0'))
 
   const options = quote?.options || []
   const productList = activeOption?.products || []
-  const costPools = quote?.group_cost_pools || []
-  const laborPools = quote?.group_labor_pools || []
+  const selectedProduct = selectedProductId ? productList.find(p => p.id === selectedProductId) : null
 
   // Sync shipping from quote prop
   useEffect(() => {
@@ -314,22 +191,6 @@ export default function SidePanel({ quote, activeOption, onOptionSelect, onQuote
       .then(setSummary)
       .catch(e => console.error('Summary load failed:', e))
   }, [quote?.id, quote?.total_price, quote?.total_cost, quote?.total_hours])
-
-  async function handleDeleteCostPool(poolId) {
-    if (!window.confirm('Delete this shared cost pool?')) return
-    try {
-      const updated = await groupCostPools.delete(poolId)
-      onQuoteUpdate(updated)
-    } catch (e) { console.error(e) }
-  }
-
-  async function handleDeleteLaborPool(poolId) {
-    if (!window.confirm('Delete this shared hours pool?')) return
-    try {
-      const updated = await groupLaborPools.delete(poolId)
-      onQuoteUpdate(updated)
-    } catch (e) { console.error(e) }
-  }
 
   async function saveShipping() {
     const val = parseFloat(localShipping) || 0
@@ -360,11 +221,20 @@ export default function SidePanel({ quote, activeOption, onOptionSelect, onQuote
         </div>
       )}
 
+      {/* ── Product Rate/Margin Editor ── */}
+      {selectedProduct && (
+        <ProductRateEditor
+          product={selectedProduct}
+          optionId={activeOption?.id}
+          onQuoteUpdate={onQuoteUpdate}
+          onClose={onProductDeselect}
+        />
+      )}
+
       {/* ── Job Summary ── */}
       <div className="canvas-panel">
         <div className="canvas-panel-title">Summary</div>
 
-        {/* Cost groups */}
         {summary ? (
           <>
             <SummaryRow label="Materials" value={fmt$(summary.material_cost_total)} accent="cost" />
@@ -432,78 +302,6 @@ export default function SidePanel({ quote, activeOption, onOptionSelect, onQuote
             disabled={shippingSaving}
           />
         </div>
-      </div>
-
-      {/* ── Shared Costs ── */}
-      <div className="canvas-panel">
-        <SectionHeader title="Shared Costs">
-          {!addingCostPool && (
-            <button className="sp-add-btn" onClick={() => setAddingCostPool(true)} title="Add cost pool">
-              <Plus size={13} />
-            </button>
-          )}
-        </SectionHeader>
-
-        {costPools.map(pool => (
-          <PoolCard
-            key={pool.id}
-            pool={pool}
-            type="cost"
-            productList={productList}
-            onUpdate={onQuoteUpdate}
-            onDelete={handleDeleteCostPool}
-          />
-        ))}
-
-        {addingCostPool && (
-          <NewPoolForm
-            type="cost"
-            productList={productList}
-            quoteId={quote.id}
-            onCreated={(updated) => { onQuoteUpdate(updated); setAddingCostPool(false) }}
-            onCancel={() => setAddingCostPool(false)}
-          />
-        )}
-
-        {costPools.length === 0 && !addingCostPool && (
-          <p className="sp-empty">No shared costs yet</p>
-        )}
-      </div>
-
-      {/* ── Shared Hours ── */}
-      <div className="canvas-panel">
-        <SectionHeader title="Shared Hours">
-          {!addingLaborPool && (
-            <button className="sp-add-btn" onClick={() => setAddingLaborPool(true)} title="Add hours pool">
-              <Plus size={13} />
-            </button>
-          )}
-        </SectionHeader>
-
-        {laborPools.map(pool => (
-          <PoolCard
-            key={pool.id}
-            pool={pool}
-            type="labor"
-            productList={productList}
-            onUpdate={onQuoteUpdate}
-            onDelete={handleDeleteLaborPool}
-          />
-        ))}
-
-        {addingLaborPool && (
-          <NewPoolForm
-            type="labor"
-            productList={productList}
-            quoteId={quote.id}
-            onCreated={(updated) => { onQuoteUpdate(updated); setAddingLaborPool(false) }}
-            onCancel={() => setAddingLaborPool(false)}
-          />
-        )}
-
-        {laborPools.length === 0 && !addingLaborPool && (
-          <p className="sp-empty">No shared hours yet</p>
-        )}
       </div>
 
     </aside>

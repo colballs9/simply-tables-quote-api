@@ -38,20 +38,26 @@ Core layers are live and actively deployed:
 3. Frontend is served from `/` by FastAPI static mount
 4. Health endpoint: `/health`
 5. DATABASE_URL must use the async driver form: `postgresql+asyncpg://...`
-6. Product columns in Quote Builder are rendered in deterministic order (`sort_order`, then `id`) to avoid visual swapping while editing
+6. **Phase 2 block architecture active** — `quote_blocks` + `quote_block_members` replace old per-product `cost_blocks`/`labor_blocks` and `group_cost_pools`/`group_labor_pools`
+7. `system_defaults` table stores app-level rate/margin defaults, inherited to quotes then products
+8. Products rendered in deterministic order (`sort_order`, then `id`)
 
 ### What Needs To Happen Next
 
-1. Continue frontend workflow improvements (options/products UX, catalog/settings pages)
+1. Run migration 006 on Cloud SQL before deploying Phase 2 build
 2. Populate/maintain reference tables (material context, base catalog)
 3. Transition from `metadata.create_all` bootstrap pattern to strict Alembic migration workflow
 4. Add regression tests for API + frontend integration paths
+5. Build catalog/settings pages
+6. Product detail editing (click product header to open spec editor)
 
 ### Frontend UX Notes (Current)
 
-1. Quote Builder now uses a horizontal, column-based product canvas for spreadsheet-like editing
-2. Each product editor is sectioned: General Specs, Descriptions, Cost Blocks, Labor Blocks, Final Pricing
-3. Cost block helper text explicitly documents `fixed` behavior: `cost_pp = cost_per_unit * units_per_product`
+1. Quote Builder uses a spreadsheet-style canvas: block rows × product columns
+2. Cost blocks and labor blocks are managed at the quote level with per-product membership
+3. Built-in blocks (species, stone, rate labor) are auto-created by pipelines — users edit rates, not block structure
+4. Side panel shows summary, shipping, and shared pool management
+5. Cost block `fixed` semantics: `cost_pp = cost_per_unit * units_per_product`
 
 ---
 
@@ -99,14 +105,12 @@ These decisions were made in conversation with Colin. They are intentional and s
 ### Dynamic blocks, not fixed slots
 The Google Sheet has fixed slots (UC1-UC9, GC1-GC6, UH1-UH2 per labor center). The web app creates blocks **on demand** — start with zero, add as needed via "New Unit Cost" / "New Group Cost" buttons. This eliminates scrolling through empty slots.
 
-### Cost/labor blocks live at the product level
-Each product owns its own cost blocks and labor blocks. This was debated (quote-level vs product-level) and product-level was chosen because:
-- Different products need different blocks
-- Presets apply per-product
-- The UI shows each product as a collapsed card — you only see one product's blocks at a time
-
-### Group cost/labor pools live at the quote level
-Group blocks distribute a lump sum across multiple products. They must be at the quote level because they cross product boundaries. The `group_cost_pool_members` junction table tracks which products participate (replacing the checkbox gating from the sheet).
+### All blocks live at the quote level (Phase 2)
+Cost and labor blocks are defined at the quote level (`quote_blocks` table) with per-product membership via `quote_block_members`. This replaced the earlier design where blocks lived on individual products. Benefits:
+- Spreadsheet-style canvas: blocks as rows, products as columns
+- Group blocks (distribute lump sums) and unit/rate blocks use the same table
+- Per-member overrides (cost_per_unit, hours_per_unit, is_active) allow product-specific values
+- Built-in blocks are auto-created by pipelines (species, stone, rate labor) — users customize rates, not structure
 
 ### `on_qty_change` flag on group pools
 When a product's quantity changes after a group pool was set up, Colin wants to choose:
@@ -214,15 +218,19 @@ PT = Product Total (PP × Quantity)
 │   ├── __init__.py
 │   ├── main.py              ← FastAPI app, CORS, router registration
 │   ├── database.py           ← async SQLAlchemy + asyncpg connection
-│   ├── models.py             ← 15 ORM models (mirrors schema_v1.sql)
+│   ├── models.py             ← ORM models (Phase 2 block architecture)
 │   ├── schemas.py            ← Pydantic request/response validation
 │   ├── routers/
 │   │   ├── quotes.py         ← CRUD + list + force recalculate
-│   │   ├── products.py       ← CRUD under options, auto-recalc
-│   │   ├── cost_blocks.py    ← CRUD under products, auto-recalc
-│   │   ├── labor_blocks.py   ← CRUD under products, auto-recalc
-│   │   ├── group_pools.py    ← Group cost + labor pools + members
-│   │   └── catalog.py        ← Stock base catalog + material context
+│   │   ├── products.py       ← CRUD under options, auto-recalc, inherits defaults
+│   │   ├── quote_blocks.py   ← Block CRUD + member management (Phase 2)
+│   │   ├── defaults.py       ← System defaults GET/PATCH (Phase 2)
+│   │   ├── catalog.py        ← Stock base catalog + material context
+│   │   ├── debug.py          ← Detailed calculation trace per product
+│   │   ├── summary.py        ← Aggregated cost/labor summary for side panel
+│   │   ├── species.py        ← Species assignment pricing
+│   │   ├── stone.py          ← Stone assignment pricing
+│   │   └── components.py     ← Product component (Material Builder) CRUD
 │   └── services/
 │       └── quote_service.py  ← Load → convert → compute → save orchestrator
 ├── calc_engine.py             ← Pure calculation functions (27 tests passing)
@@ -276,23 +284,17 @@ All endpoints are prefixed with `/api`.
 | PATCH | `/quotes/{id}` | Update quote fields |
 | DELETE | `/quotes/{id}` | Delete quote (cascades) |
 | POST | `/quotes/{id}/recalculate` | Force full recalculation |
-| POST | `/options/{id}/products` | Add product to option |
+| POST | `/options/{id}/products` | Add product to option (inherits defaults) |
 | PATCH | `/options/{id}/products/{id}` | Update product specs |
 | DELETE | `/options/{id}/products/{id}` | Remove product |
-| POST | `/products/{id}/cost-blocks` | Add unit cost block |
-| PATCH | `/products/{id}/cost-blocks/{id}` | Update cost block |
-| DELETE | `/products/{id}/cost-blocks/{id}` | Remove cost block |
-| POST | `/products/{id}/labor-blocks` | Add labor block |
-| PATCH | `/products/{id}/labor-blocks/{id}` | Update labor block |
-| DELETE | `/products/{id}/labor-blocks/{id}` | Remove labor block |
-| POST | `/quotes/{id}/group-cost-pools` | Create group cost pool |
-| PATCH | `/group-cost-pools/{id}` | Update pool |
-| DELETE | `/group-cost-pools/{id}` | Delete pool |
-| POST | `/group-cost-pools/{id}/members/{product_id}` | Add product to pool |
-| DELETE | `/group-cost-pools/{id}/members/{product_id}` | Remove from pool |
-| POST | `/quotes/{id}/group-labor-pools` | Create group labor pool |
-| PATCH | `/group-labor-pools/{id}` | Update pool |
-| DELETE | `/group-labor-pools/{id}` | Delete pool |
+| POST | `/quotes/{id}/blocks` | Create quote block (with optional member IDs) |
+| PATCH | `/blocks/{id}` | Update block definition |
+| DELETE | `/blocks/{id}` | Delete block + all members |
+| POST | `/blocks/{id}/members/{product_id}` | Add product to block |
+| PATCH | `/blocks/{id}/members/{product_id}` | Update member overrides |
+| DELETE | `/blocks/{id}/members/{product_id}` | Remove product from block |
+| GET | `/defaults` | Get system defaults |
+| PATCH | `/defaults` | Update system defaults |
 | GET | `/catalog` | Search stock base catalog |
 | GET | `/catalog/{id}` | Get catalog item |
 | GET | `/material-context` | All material types + UI config |

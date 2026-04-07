@@ -15,6 +15,10 @@ This document is the safe execution plan for future chats. Follow this order and
 - Required DB driver: postgresql+asyncpg
 - Product column order in UI is deterministic: sort_order, then id
 - Cost block fixed semantics: cost_pp = cost_per_unit * units_per_product
+- Phase 2 block architecture: quote_blocks + quote_block_members replace per-product blocks and group pools
+- system_defaults → quote defaults → product: inheritance chain for rates/margins
+- See deployment incident note: "Known Issue: Migration Drift on Existing Cloud SQL (Apr 7, 2026)" in DEPLOYMENT_NOTES.md before running migrations on an existing DB.
+- Phase 2 migration (006) drops old block/pool tables — run only after confirming no live data
 
 ## Non-Negotiable Invariants
 
@@ -23,6 +27,8 @@ This document is the safe execution plan for future chats. Follow this order and
 3. Keep frontend build stage installing dev dependencies (vite needed at build time).
 4. Do not switch DATABASE_URL back to psycopg2 for async SQLAlchemy engine.
 5. Preserve API route contract under /api unless migration plan is approved.
+6. Pipelines (species, stone, rate labor) must not overwrite user-customized rates — only create blocks if missing.
+7. System defaults → quote defaults → product defaults: each level is overridable but never auto-overwritten.
 
 ## Safe Change Workflow
 

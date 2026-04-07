@@ -4,6 +4,7 @@ import { Plus, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react'
 import { quotes, products } from '../api/client'
 import ProductCard from '../components/ProductCard'
 import SidePanel from '../components/SidePanel'
+import QuoteCanvas from '../components/QuoteCanvas'
 
 function formatPrice(val) {
   if (!val && val !== 0) return '—'
@@ -20,6 +21,7 @@ export default function QuoteBuilder() {
   const [recalculating, setRecalculating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [selectedOptionId, setSelectedOptionId] = useState('')
+  const [selectedProductId, setSelectedProductId] = useState(null)
 
   // Load or create quote
   useEffect(() => {
@@ -272,6 +274,8 @@ export default function QuoteBuilder() {
           activeOption={activeOption}
           onOptionSelect={setSelectedOptionId}
           onQuoteUpdate={refreshQuote}
+          selectedProductId={selectedProductId}
+          onProductDeselect={() => setSelectedProductId(null)}
         />
 
         <section className="quote-canvas-right">
@@ -282,21 +286,13 @@ export default function QuoteBuilder() {
             </div>
           )}
 
-          <div className="product-columns">
-            {sortedProductList.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                optionId={activeOption?.id}
-                onUpdate={refreshQuote}
-                mode="column"
-              />
-            ))}
-
-            <button className="add-product-column" onClick={handleAddProduct} disabled={saving || !activeOption}>
-              <Plus size={16} /> Add Product
-            </button>
-          </div>
+          <QuoteCanvas
+            quote={quote}
+            activeOption={activeOption}
+            onQuoteUpdate={refreshQuote}
+            selectedProductId={selectedProductId}
+            onProductSelect={setSelectedProductId}
+          />
         </section>
       </div>
     </div>

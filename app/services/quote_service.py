@@ -1,5 +1,5 @@
 """
-Quote Service — business logic layer.
+Quote Service — business logic layer (Phase 2 quote block architecture).
 
 Loads the full quote graph from the database, converts to the dict format
 the calc engine expects, runs computation, and writes results back.
@@ -17,10 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..models import (
-    Quote, QuoteOption, Product, CostBlock, LaborBlock,
-    GroupCostPool, GroupCostPoolMember,
-    GroupLaborPool, GroupLaborPoolMember,
+    Quote, QuoteOption, Product, QuoteBlock, QuoteBlockMember,
     Tag, SpeciesAssignment, ProductComponent, StoneAssignment,
+    SystemDefaults,
 )
 
 # Import the calc engine — lives one directory up
@@ -44,17 +43,9 @@ async def load_full_quote(db: AsyncSession, quote_id: uuid.UUID) -> Quote | None
         .options(
             selectinload(Quote.options)
                 .selectinload(QuoteOption.products)
-                .selectinload(Product.cost_blocks),
-            selectinload(Quote.options)
-                .selectinload(QuoteOption.products)
-                .selectinload(Product.labor_blocks),
-            selectinload(Quote.options)
-                .selectinload(QuoteOption.products)
                 .selectinload(Product.components),
-            selectinload(Quote.group_cost_pools)
-                .selectinload(GroupCostPool.members),
-            selectinload(Quote.group_labor_pools)
-                .selectinload(GroupLaborPool.members),
+            selectinload(Quote.quote_blocks)
+                .selectinload(QuoteBlock.members),
             selectinload(Quote.species_assignments),
             selectinload(Quote.stone_assignments),
         )
@@ -70,41 +61,21 @@ async def load_tags(db: AsyncSession) -> dict[str, str]:
     return {str(t.id): t.name for t in tags}
 
 
+async def load_system_defaults(db: AsyncSession) -> SystemDefaults | None:
+    """Load the global system defaults row."""
+    result = await db.execute(select(SystemDefaults).where(SystemDefaults.key == "global"))
+    return result.scalar_one_or_none()
+
+
 def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
     """
     Convert ORM objects to the dict format compute_quote() expects.
+    V2: quote_blocks with members instead of per-product blocks + group pools.
     """
     options_data = []
     for option in quote.options:
         products_data = []
         for product in option.products:
-            cost_blocks_data = []
-            for cb in product.cost_blocks:
-                cost_blocks_data.append({
-                    "id": str(cb.id),
-                    "tag_id": str(cb.tag_id) if cb.tag_id else None,
-                    "cost_category": cb.cost_category,
-                    "description": cb.description,
-                    "cost_per_unit": cb.cost_per_unit,
-                    "units_per_product": cb.units_per_product,
-                    "multiplier_type": cb.multiplier_type,
-                })
-
-            labor_blocks_data = []
-            for lb in product.labor_blocks:
-                labor_blocks_data.append({
-                    "id": str(lb.id),
-                    "tag_id": str(lb.tag_id) if lb.tag_id else None,
-                    "labor_center": lb.labor_center,
-                    "block_type": lb.block_type,
-                    "description": lb.description,
-                    "rate_value": lb.rate_value,
-                    "metric_source": lb.metric_source,
-                    "rate_type": lb.rate_type or "metric",
-                    "is_active": lb.is_active,
-                    "hours_per_unit": lb.hours_per_unit,
-                })
-
             products_data.append({
                 "id": str(product.id),
                 "quantity": product.quantity,
@@ -146,9 +117,6 @@ def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
                     }
                     for c in product.components
                 ],
-                # Nested blocks
-                "cost_blocks": cost_blocks_data,
-                "labor_blocks": labor_blocks_data,
             })
 
         options_data.append({
@@ -157,34 +125,46 @@ def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
             "products": products_data,
         })
 
-    group_cost_pools_data = []
-    for pool in quote.group_cost_pools:
-        group_cost_pools_data.append({
-            "id": str(pool.id),
-            "tag_id": str(pool.tag_id) if pool.tag_id else None,
-            "total_amount": pool.total_amount,
-            "distribution_type": pool.distribution_type,
-            "cost_category": pool.cost_category,
-            "on_qty_change": pool.on_qty_change,
-            "members": [
-                {"id": str(m.id), "product_id": str(m.product_id)}
-                for m in pool.members
-            ],
-        })
+    # Quote blocks with members
+    quote_blocks_data = []
+    for block in quote.quote_blocks:
+        members_data = []
+        for m in block.members:
+            members_data.append({
+                "id": str(m.id),
+                "product_id": str(m.product_id),
+                "description": m.description,
+                "hours_per_unit": m.hours_per_unit,
+                "cost_per_unit": m.cost_per_unit,
+                "is_active": m.is_active,
+            })
 
-    group_labor_pools_data = []
-    for pool in quote.group_labor_pools:
-        group_labor_pools_data.append({
-            "id": str(pool.id),
-            "tag_id": str(pool.tag_id) if pool.tag_id else None,
-            "labor_center": pool.labor_center,
-            "total_hours": pool.total_hours,
-            "distribution_type": pool.distribution_type,
-            "on_qty_change": pool.on_qty_change,
-            "members": [
-                {"id": str(m.id), "product_id": str(m.product_id)}
-                for m in pool.members
-            ],
+        quote_blocks_data.append({
+            "id": str(block.id),
+            "tag_id": str(block.tag_id) if block.tag_id else None,
+            "block_domain": block.block_domain,
+            "block_type": block.block_type,
+            "label": block.label,
+            "is_builtin": block.is_builtin,
+            "is_active": block.is_active,
+            # Cost fields
+            "cost_category": block.cost_category,
+            "cost_per_unit": block.cost_per_unit,
+            "units_per_product": block.units_per_product,
+            "multiplier_type": block.multiplier_type,
+            # Labor fields
+            "labor_center": block.labor_center,
+            "rate_value": block.rate_value,
+            "metric_source": block.metric_source,
+            "rate_type": block.rate_type or "metric",
+            "hours_per_unit": block.hours_per_unit,
+            # Group fields
+            "total_amount": block.total_amount,
+            "total_hours": block.total_hours,
+            "distribution_type": block.distribution_type,
+            "on_qty_change": block.on_qty_change,
+            # Members
+            "members": members_data,
         })
 
     return {
@@ -196,8 +176,7 @@ def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
         },
         "tags": tags,
         "options": options_data,
-        "group_cost_pools": group_cost_pools_data,
-        "group_labor_pools": group_labor_pools_data,
+        "quote_blocks": quote_blocks_data,
     }
 
 
@@ -223,21 +202,15 @@ async def save_computed_results(db: AsyncSession, quote: Quote, engine_result: d
 
     # Build lookup maps by string ID
     product_map: dict[str, Product] = {}
-    cost_block_map: dict[str, CostBlock] = {}
-    labor_block_map: dict[str, LaborBlock] = {}
     component_map: dict[str, ProductComponent] = {}
 
     for option in quote.options:
         for product in option.products:
             product_map[str(product.id)] = product
-            for cb in product.cost_blocks:
-                cost_block_map[str(cb.id)] = cb
-            for lb in product.labor_blocks:
-                labor_block_map[str(lb.id)] = lb
             for c in product.components:
                 component_map[str(c.id)] = c
 
-    # Options
+    # Options + Products
     for opt_data in engine_result.get("options", []):
         for orm_opt in quote.options:
             if str(orm_opt.id) == opt_data["id"]:
@@ -246,7 +219,6 @@ async def save_computed_results(db: AsyncSession, quote: Quote, engine_result: d
                 orm_opt.total_hours = _dec(opt_data.get("total_hours"))
                 break
 
-        # Products
         for prod_data in opt_data.get("products", []):
             orm_prod = product_map.get(prod_data["id"])
             if not orm_prod:
@@ -266,20 +238,6 @@ async def save_computed_results(db: AsyncSession, quote: Quote, engine_result: d
             orm_prod.sale_price_pp = _dec(prod_data.get("sale_price_pp"))
             orm_prod.sale_price_total = _dec(prod_data.get("sale_price_total"))
 
-            # Cost blocks
-            for cb_data in prod_data.get("cost_blocks", []):
-                orm_cb = cost_block_map.get(cb_data.get("id"))
-                if orm_cb:
-                    orm_cb.cost_pp = _dec(cb_data.get("cost_pp"))
-                    orm_cb.cost_pt = _dec(cb_data.get("cost_pt"))
-
-            # Labor blocks
-            for lb_data in prod_data.get("labor_blocks", []):
-                orm_lb = labor_block_map.get(lb_data.get("id"))
-                if orm_lb:
-                    orm_lb.hours_pp = _dec(lb_data.get("hours_pp"))
-                    orm_lb.hours_pt = _dec(lb_data.get("hours_pt"))
-
             # Components
             for c_data in prod_data.get("components", []):
                 orm_c = component_map.get(c_data.get("id"))
@@ -289,33 +247,21 @@ async def save_computed_results(db: AsyncSession, quote: Quote, engine_result: d
                     orm_c.sq_ft_per_piece = _dec(c_data.get("sq_ft_per_piece"))
                     orm_c.sq_ft_pp = _dec(c_data.get("sq_ft_pp"))
 
-    # Group cost pool members
-    pool_member_map: dict[str, GroupCostPoolMember] = {}
-    for pool in quote.group_cost_pools:
-        for m in pool.members:
-            pool_member_map[str(m.id)] = m
+    # Quote block members — write computed values back
+    member_map: dict[str, QuoteBlockMember] = {}
+    for block in quote.quote_blocks:
+        for m in block.members:
+            member_map[str(m.id)] = m
 
-    for pool_data in engine_result.get("group_cost_pools", []):
-        for m_data in pool_data.get("members", []):
-            orm_m = pool_member_map.get(m_data.get("id"))
+    for block_data in engine_result.get("quote_blocks", []):
+        for m_data in block_data.get("members", []):
+            orm_m = member_map.get(m_data.get("id"))
             if orm_m:
-                orm_m.metric_value = _dec(m_data.get("metric_value"))
                 orm_m.cost_pp = _dec(m_data.get("cost_pp"))
                 orm_m.cost_pt = _dec(m_data.get("cost_pt"))
-
-    # Group labor pool members
-    labor_member_map: dict[str, GroupLaborPoolMember] = {}
-    for pool in quote.group_labor_pools:
-        for m in pool.members:
-            labor_member_map[str(m.id)] = m
-
-    for pool_data in engine_result.get("group_labor_pools", []):
-        for m_data in pool_data.get("members", []):
-            orm_m = labor_member_map.get(m_data.get("id"))
-            if orm_m:
-                orm_m.metric_value = _dec(m_data.get("metric_value"))
                 orm_m.hours_pp = _dec(m_data.get("hours_pp"))
                 orm_m.hours_pt = _dec(m_data.get("hours_pt"))
+                orm_m.metric_value = _dec(m_data.get("metric_value"))
 
     await db.flush()
 
@@ -325,28 +271,18 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
     Ensure species_assignment records and built-in species cost blocks are
     up-to-date for all Hardwood/Live Edge products in the quote.
 
-    Called before compute_quote() in recalculate_quote(). The species blocks
-    created here are treated as normal cost blocks by the engine.
+    Creates quote-level QuoteBlock (block_domain='cost', block_type='unit',
+    cost_category='species') with QuoteBlockMember per product.
 
     Supports multiple species per product (top + components with different species).
-    Each (product, species_key) pair gets its own built-in block with:
-      multiplier_type = "per_unit", units_per_product = total_bd_ft_pp for that species,
-      cost_per_unit = price_per_bdft → cost_pp = price × bdft.
-
-    Flow:
-      1. Scan products + components → collect (species_key, bd_ft_pp) per product
-      2. Upsert species_assignments (one per quote × species_key)
-      3. Upsert built-in species cost blocks (one per product × species_key)
-      4. Remove stale species blocks for species no longer in the product
+    Each species_key gets its own built-in block with per-member cost_per_unit = price_per_bdft
+    and units_per_product = bd_ft_pp for that species on that product.
     """
     from decimal import Decimal
 
     # ── Pass 1: collect species bdft from tops and components ──────────
-    # species_key → total bdft across entire quote (qty-weighted)
     species_total_bdft: dict[str, Decimal] = {}
-    # species_key → (species_name, quarter_code)
     species_meta: dict[str, tuple[str, str]] = {}
-    # product.id str → {species_key: bd_ft_pp}
     product_species_bdft: dict[str, dict[str, Decimal]] = {}
 
     LUMBER_COMPONENTS = ("plank", "leg", "apron_l", "apron_w")
@@ -389,7 +325,6 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
                 if not comp.material or not comp.thickness:
                     continue
 
-                # Derive quarter code from raw thickness
                 raw_t = round(float(comp.thickness), 1)
                 quarter_code = COMPONENT_QUARTER_CODE_LOOKUP.get(str(raw_t))
                 if not quarter_code:
@@ -454,63 +389,107 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
 
     await db.flush()
 
-    # ── Pass 3: upsert built-in species cost blocks ────────────────────
-    # One block per (product, species_key). Keyed by description = species_key.
-    # Uses per_unit with units_per_product = total bd_ft_pp for that species,
-    # so cost_pp = price_per_bdft × total_bd_ft_pp.
-    for option in quote.options:
-        for product in option.products:
-            pid = str(product.id)
-            species_by_key = product_species_bdft.get(pid, {})
+    # ── Pass 3: upsert built-in species QuoteBlocks ───────────────────
+    # One block per species_key. Members are products that use that species.
+    # Block: cost_category='species', multiplier_type='per_unit',
+    #        cost_per_unit = price_per_bdft (on block),
+    #        units_per_product = bd_ft_pp for that species (varies per member, but
+    #        stored at block level since the engine uses it from the block).
+    # Actually, units_per_product varies per product × species, so we store
+    # bd_ft_pp per member by using cost_per_unit on the member.
+    # Strategy: block.cost_per_unit = 1 (identity), member.cost_per_unit = price × bdft
+    # Simpler: block stores price, multiplier_type = per_unit,
+    # each member's units_per_product effectively comes from the member override.
+    #
+    # Cleanest approach: block has multiplier_type='per_unit', cost_per_unit=price_per_bdft.
+    # We set units_per_product on the block to 1 (not used for per_unit when member
+    # doesn't override cost_per_unit). Each member's cost_per_unit = price × bd_ft_pp
+    # so cost_pp = cost_per_unit × units_per_product = (price×bdft) × 1 = price×bdft.
+    #
+    # Wait — the engine compute_cost_block uses block.units_per_product for per_unit type.
+    # So cost_pp = member.cost_per_unit × block.units_per_product.
+    # We want cost_pp = price_per_bdft × bd_ft_pp.
+    # Set member.cost_per_unit = price_per_bdft, block.units_per_product = bd_ft_pp?
+    # No, bdft varies per member.
+    #
+    # Best approach: each member stores cost_per_unit = price × bdft (the total species
+    # cost for this product). Block uses multiplier_type='per_unit', units_per_product=1.
+    # Engine: cost_pp = cost_per_unit × 1 = pre-computed species cost.
 
-            if not species_by_key:
-                # Remove any stale species blocks if product no longer has lumber
-                stale = [cb for cb in product.cost_blocks
-                         if cb.is_builtin and cb.cost_category == "species"]
-                for cb in stale:
-                    await db.delete(cb)
-                continue
+    existing_blocks: dict[str, QuoteBlock] = {
+        b.label: b
+        for b in quote.quote_blocks
+        if b.is_builtin and b.block_domain == "cost" and b.cost_category == "species"
+    }
 
-            # Index existing built-in species blocks by description (= species_key)
-            existing_blocks: dict[str, CostBlock] = {
-                cb.description: cb
-                for cb in product.cost_blocks
-                if cb.is_builtin and cb.cost_category == "species"
-            }
+    for species_key, total_bdft in species_total_bdft.items():
+        price = prices.get(species_key, Decimal("0"))
 
-            # Upsert one block per species_key
-            for species_key, bd_ft_pp in species_by_key.items():
-                price = prices.get(species_key, Decimal("0"))
+        if species_key in existing_blocks:
+            block = existing_blocks.pop(species_key)
+        else:
+            block = QuoteBlock(
+                quote_id=quote.id,
+                sort_order=0,
+                is_builtin=True,
+                is_active=True,
+                block_domain="cost",
+                block_type="unit",
+                label=species_key,
+                cost_category="species",
+                cost_per_unit=None,  # member-level override used instead
+                units_per_product=1,
+                multiplier_type="per_unit",
+            )
+            db.add(block)
+            quote.quote_blocks.append(block)
 
-                if species_key in existing_blocks:
-                    cb = existing_blocks.pop(species_key)
-                    cb.cost_per_unit = float(price) if price else None
-                    cb.units_per_product = float(bd_ft_pp)
+        await db.flush()
+
+        # Build member map for this block
+        existing_members: dict[str, QuoteBlockMember] = {
+            str(m.product_id): m for m in block.members
+        }
+
+        # Determine which products need members
+        for option in quote.options:
+            for product in option.products:
+                pid = str(product.id)
+                bd_ft = product_species_bdft.get(pid, {}).get(species_key)
+                if bd_ft is None or bd_ft == 0:
+                    # Remove stale member if exists
+                    if pid in existing_members:
+                        await db.delete(existing_members.pop(pid))
+                    continue
+
+                member_cost = float(price * bd_ft) if price else None
+
+                if pid in existing_members:
+                    m = existing_members.pop(pid)
+                    m.cost_per_unit = member_cost
                 else:
-                    cb = CostBlock(
+                    m = QuoteBlockMember(
+                        quote_block_id=block.id,
                         product_id=product.id,
-                        sort_order=0,
-                        cost_category="species",
-                        description=species_key,
-                        cost_per_unit=float(price) if price else None,
-                        units_per_product=float(bd_ft_pp),
-                        multiplier_type="per_unit",
-                        is_builtin=True,
+                        cost_per_unit=member_cost,
                     )
-                    db.add(cb)
-                    product.cost_blocks.append(cb)
+                    db.add(m)
+                    block.members.append(m)
 
-            # Remove stale species blocks (species no longer on this product)
-            for stale_cb in existing_blocks.values():
-                await db.delete(stale_cb)
-                product.cost_blocks.remove(stale_cb)
+        # Remove any remaining stale members
+        for stale_m in existing_members.values():
+            await db.delete(stale_m)
+
+    # Remove stale species blocks (species no longer in any product)
+    for stale_block in existing_blocks.values():
+        await db.delete(stale_block)
+        if stale_block in quote.quote_blocks:
+            quote.quote_blocks.remove(stale_block)
 
     await db.flush()
 
 
 # Default configs for built-in rate labor blocks, keyed by material_type.
-# rate_value units: sqft/hr for panel_sqft/top_sqft sources, panels/hr for panel_count.
-# Default rates verified against Farmhouse Kitchen 0737.
 _BUILTIN_RATE_LABOR: dict[str, list[dict]] = {
     "Hardwood": [
         {"labor_center": "LC101", "description": "Processing",     "metric_source": "panel_sqft",  "rate_value": 15.0},
@@ -529,50 +508,92 @@ _BUILTIN_RATE_LABOR["Laminate"] = _BUILTIN_RATE_LABOR["Hardwood"]
 
 async def manage_rate_labor_pipeline(db: AsyncSession, quote: Quote) -> None:
     """
-    Ensure built-in rate labor blocks exist for each product based on material_type.
+    Ensure built-in rate labor blocks exist for each material_type's labor centers.
 
-    Creates the block with the default rate if it doesn't exist. Does NOT overwrite
-    rate_value on existing blocks (user may have customized the rate).
-    Removes built-in rate blocks whose labor_center is no longer appropriate
-    for the current material_type.
+    Creates quote-level QuoteBlocks (block_domain='labor', block_type='rate')
+    with members for products of the relevant material type.
 
-    Called before the engine runs so the blocks are included in computation.
+    Does NOT overwrite rate_value on existing blocks (user may have customized).
+    Removes blocks whose labor_center is no longer needed by any product.
     """
+    # Collect which labor centers are needed and which products need them
+    # lc_key = (labor_center, metric_source) to handle uniqueness
+    needed_lcs: dict[str, dict] = {}  # labor_center → config dict
+    lc_products: dict[str, list[Product]] = {}  # labor_center → [products]
+
     for option in quote.options:
         for product in option.products:
-            expected = _BUILTIN_RATE_LABOR.get(product.material_type, [])
-            expected_lcs = {cfg["labor_center"] for cfg in expected}
-
-            # Index existing built-in rate labor blocks by labor_center
-            existing: dict[str, LaborBlock] = {
-                lb.labor_center: lb
-                for lb in product.labor_blocks
-                if lb.is_builtin and lb.block_type == "rate"
-            }
-
-            # Remove stale blocks (labor center no longer expected for this material)
-            for lc, lb in list(existing.items()):
-                if lc not in expected_lcs:
-                    await db.delete(lb)
-                    product.labor_blocks.remove(lb)
-
-            # Create missing blocks with default rates
-            for cfg in expected:
+            configs = _BUILTIN_RATE_LABOR.get(product.material_type, [])
+            for cfg in configs:
                 lc = cfg["labor_center"]
-                if lc not in existing:
-                    lb = LaborBlock(
-                        product_id=product.id,
-                        sort_order=0,
-                        labor_center=lc,
-                        description=cfg["description"],
-                        block_type="rate",
-                        metric_source=cfg["metric_source"],
-                        rate_value=cfg["rate_value"],
-                        is_active=True,
-                        is_builtin=True,
-                    )
-                    db.add(lb)
-                    product.labor_blocks.append(lb)
+                if lc not in needed_lcs:
+                    needed_lcs[lc] = cfg
+                    lc_products[lc] = []
+                lc_products[lc].append(product)
+
+    # Index existing built-in rate labor blocks by labor_center
+    existing_blocks: dict[str, QuoteBlock] = {
+        b.labor_center: b
+        for b in quote.quote_blocks
+        if b.is_builtin and b.block_domain == "labor" and b.block_type == "rate"
+        and b.labor_center is not None
+    }
+
+    # Remove stale blocks (labor center no longer needed by any product)
+    for lc, block in list(existing_blocks.items()):
+        if lc not in needed_lcs:
+            await db.delete(block)
+            if block in quote.quote_blocks:
+                quote.quote_blocks.remove(block)
+            del existing_blocks[lc]
+
+    # Upsert blocks and members
+    for lc, cfg in needed_lcs.items():
+        products = lc_products[lc]
+
+        if lc in existing_blocks:
+            block = existing_blocks[lc]
+            # Don't overwrite rate_value — user may have customized
+        else:
+            block = QuoteBlock(
+                quote_id=quote.id,
+                sort_order=0,
+                is_builtin=True,
+                is_active=True,
+                block_domain="labor",
+                block_type="rate",
+                label=cfg["description"],
+                labor_center=lc,
+                rate_value=cfg["rate_value"],
+                metric_source=cfg["metric_source"],
+                rate_type="metric",
+            )
+            db.add(block)
+            quote.quote_blocks.append(block)
+
+        await db.flush()
+
+        # Sync members: add missing, remove stale
+        existing_members: dict[str, QuoteBlockMember] = {
+            str(m.product_id): m for m in block.members
+        }
+        needed_pids = {str(p.id) for p in products}
+
+        # Remove stale members
+        for pid, m in list(existing_members.items()):
+            if pid not in needed_pids:
+                await db.delete(m)
+
+        # Add missing members
+        for product in products:
+            pid = str(product.id)
+            if pid not in existing_members:
+                m = QuoteBlockMember(
+                    quote_block_id=block.id,
+                    product_id=product.id,
+                )
+                db.add(m)
+                block.members.append(m)
 
     await db.flush()
 
@@ -582,26 +603,14 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
     Ensure stone_assignment records and built-in stone cost blocks are
     up-to-date for all Stone products in the quote.
 
-    Called before compute_quote() in recalculate_quote().
-
-    Stone products are grouped by stone_key (= material_detail, e.g. "Quartz").
-    The user enters total_cost on the stone_assignment record.
-    The pipeline derives cost_per_sqft = total_cost / total_sqft and creates
-    a built-in cost block on each product:
-      cost_category = "stone", multiplier_type = "per_sqft",
-      cost_per_unit = cost_per_sqft → cost_pp = cost_per_sqft × product.sq_ft
-
-    Flow:
-      1. Scan Stone products → accumulate total_sqft per stone_key
-      2. Upsert stone_assignment records
-      3. Upsert built-in stone cost blocks on each product
+    Creates quote-level QuoteBlock (block_domain='cost', block_type='unit',
+    cost_category='stone') with members per stone product.
     """
     from decimal import Decimal
+    import math
 
     # ── Pass 1: collect sqft from Stone products ───────────────────────
-    # stone_key → total_sqft across quote (qty-weighted)
     stone_total_sqft: dict[str, Decimal] = {}
-    # product.id str → (stone_key, sq_ft per product)
     product_stone: dict[str, tuple[str, Decimal]] = {}
 
     for option in quote.options:
@@ -614,9 +623,6 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
             stone_key = (product.material_detail or "Stone").strip()
             w = Decimal(str(product.width))
             l = Decimal(str(product.length))
-            # Stone uses actual DIA-adjusted sqft (product.sq_ft) — exact area, not W×L
-            # For now compute from dimensions; sq_ft will be set by engine later
-            import math
             if product.shape == "DIA":
                 radius_ft = w / Decimal("24")
                 sq_ft = (Decimal(str(math.pi)) * radius_ft * radius_ft).quantize(Decimal("0.0001"))
@@ -662,43 +668,71 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
 
     await db.flush()
 
-    # ── Pass 3: upsert built-in stone cost blocks ──────────────────────
-    for option in quote.options:
-        for product in option.products:
-            pid = str(product.id)
-            if pid not in product_stone:
-                # Remove stale stone blocks if material changed away from Stone
-                stale = [cb for cb in product.cost_blocks
-                         if cb.is_builtin and cb.cost_category == "stone"]
-                for cb in stale:
-                    await db.delete(cb)
-                continue
+    # ── Pass 3: upsert built-in stone QuoteBlocks ─────────────────────
+    # One block per stone_key, with members for stone products of that key.
+    # multiplier_type='per_sqft', cost_per_unit = cost_per_sqft
+    existing_blocks: dict[str, QuoteBlock] = {
+        b.label: b
+        for b in quote.quote_blocks
+        if b.is_builtin and b.block_domain == "cost" and b.cost_category == "stone"
+    }
 
-            stone_key, _ = product_stone[pid]
-            rate = cost_per_sqft.get(stone_key, Decimal("0"))
+    for stone_key, total_sqft in stone_total_sqft.items():
+        rate = cost_per_sqft.get(stone_key, Decimal("0"))
 
-            existing_block = next(
-                (cb for cb in product.cost_blocks
-                 if cb.is_builtin and cb.cost_category == "stone"),
-                None,
+        if stone_key in existing_blocks:
+            block = existing_blocks.pop(stone_key)
+            block.cost_per_unit = float(rate) if rate else None
+        else:
+            block = QuoteBlock(
+                quote_id=quote.id,
+                sort_order=0,
+                is_builtin=True,
+                is_active=True,
+                block_domain="cost",
+                block_type="unit",
+                label=stone_key,
+                cost_category="stone",
+                cost_per_unit=float(rate) if rate else None,
+                units_per_product=1,
+                multiplier_type="per_sqft",
             )
+            db.add(block)
+            quote.quote_blocks.append(block)
 
-            if existing_block:
-                existing_block.cost_per_unit = float(rate) if rate else None
-                existing_block.description = stone_key
-            else:
-                cb = CostBlock(
-                    product_id=product.id,
-                    sort_order=0,
-                    cost_category="stone",
-                    description=stone_key,
-                    cost_per_unit=float(rate) if rate else None,
-                    units_per_product=1,
-                    multiplier_type="per_sqft",
-                    is_builtin=True,
-                )
-                db.add(cb)
-                product.cost_blocks.append(cb)
+        await db.flush()
+
+        # Sync members
+        existing_members: dict[str, QuoteBlockMember] = {
+            str(m.product_id): m for m in block.members
+        }
+
+        needed_pids = set()
+        for option in quote.options:
+            for product in option.products:
+                pid = str(product.id)
+                if pid in product_stone:
+                    sk, _ = product_stone[pid]
+                    if sk == stone_key:
+                        needed_pids.add(pid)
+                        if pid not in existing_members:
+                            m = QuoteBlockMember(
+                                quote_block_id=block.id,
+                                product_id=product.id,
+                            )
+                            db.add(m)
+                            block.members.append(m)
+
+        # Remove stale members
+        for pid, m in existing_members.items():
+            if pid not in needed_pids:
+                await db.delete(m)
+
+    # Remove stale stone blocks
+    for stale_block in existing_blocks.values():
+        await db.delete(stale_block)
+        if stale_block in quote.quote_blocks:
+            quote.quote_blocks.remove(stale_block)
 
     await db.flush()
 
@@ -713,13 +747,12 @@ async def recalculate_quote(db: AsyncSession, quote_id: uuid.UUID) -> Quote | No
         return None
 
     # Species pipeline: upsert species_assignments + built-in species cost blocks
-    # before the engine runs, so the blocks are included in the engine input.
     await manage_species_pipeline(db, quote)
 
-    # Stone pipeline: upsert stone_assignments + built-in stone cost blocks.
+    # Stone pipeline: upsert stone_assignments + built-in stone cost blocks
     await manage_stone_pipeline(db, quote)
 
-    # Rate labor pipeline: ensure built-in rate labor blocks exist for each product.
+    # Rate labor pipeline: ensure built-in rate labor blocks exist
     await manage_rate_labor_pipeline(db, quote)
 
     tags = await load_tags(db)

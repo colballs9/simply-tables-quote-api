@@ -35,7 +35,7 @@ async def get_quote_summary(
     """
     Return aggregated cost/labor summary for the quote side panel.
 
-    Reads stored computed values from cost_blocks, labor_blocks, and pool members —
+    Reads stored computed values from quote_block_members —
     no recalculation triggered.
     """
     quote = await load_full_quote(db, quote_id)
@@ -44,7 +44,7 @@ async def get_quote_summary(
 
     tags = await load_tags(db)   # {id_str: name}
 
-    # ── Aggregate across all options → products → blocks ────────────────
+    # ── Aggregate across quote_blocks → members ────────────────────────
     cost_by_category: dict[str, Decimal] = {}
     cost_by_tag: dict[str, Decimal] = {}
     hours_by_tag: dict[str, Decimal] = {}
@@ -53,29 +53,29 @@ async def get_quote_summary(
     total_material_price = Decimal("0")
     hours_price_total = Decimal("0")
 
-    for option in quote.options:
-        for product in option.products:
-            hourly_rate = _d(product.hourly_rate or 155)
+    for block in quote.quote_blocks:
+        domain = block.block_domain
+        tag_id = str(block.tag_id) if block.tag_id else None
+        tag_name = tags.get(tag_id, "Untagged") if tag_id else None
 
-            for cb in product.cost_blocks:
-                cat = cb.cost_category or "other"
-                cost_pt = _d(cb.cost_pt)
+        for member in block.members:
+            if domain == "cost":
+                cat = block.cost_category or "other"
+                cost_pt = _d(member.cost_pt)
                 cost_by_category[cat] = cost_by_category.get(cat, Decimal("0")) + cost_pt
-
-                if cb.tag_id:
-                    tag_name = tags.get(str(cb.tag_id), "Untagged")
+                if tag_name:
                     cost_by_tag[tag_name] = cost_by_tag.get(tag_name, Decimal("0")) + cost_pt
 
-            for lb in product.labor_blocks:
-                lc = lb.labor_center or "unknown"
-                hours_pt = _d(lb.hours_pt)
+            elif domain == "labor":
+                lc = block.labor_center or "unknown"
+                hours_pt = _d(member.hours_pt)
                 hours_by_lc[lc] = hours_by_lc.get(lc, Decimal("0")) + hours_pt
-
-                if lb.tag_id:
-                    tag_name = tags.get(str(lb.tag_id), "Untagged")
+                if tag_name:
                     hours_by_tag[tag_name] = hours_by_tag.get(tag_name, Decimal("0")) + hours_pt
 
-            # Accumulate margin and price from stored product-level computed values
+    # Accumulate margin and price from stored product-level computed values
+    for option in quote.options:
+        for product in option.products:
             qty = _d(product.quantity or 1)
             if product.total_material_margin is not None:
                 total_margin += _d(product.total_material_margin) * qty
@@ -83,29 +83,6 @@ async def get_quote_summary(
                 total_material_price += _d(product.total_material_price) * qty
             if product.hours_price is not None:
                 hours_price_total += _d(product.hours_price) * qty
-
-    # Group pool members
-    for pool in quote.group_cost_pools:
-        cat = pool.cost_category or "group_cost"
-        tag_id = str(pool.tag_id) if pool.tag_id else None
-        tag_name = tags.get(tag_id, "Untagged") if tag_id else None
-
-        for m in pool.members:
-            cost_pt = _d(m.cost_pt)
-            cost_by_category[cat] = cost_by_category.get(cat, Decimal("0")) + cost_pt
-            if tag_name:
-                cost_by_tag[tag_name] = cost_by_tag.get(tag_name, Decimal("0")) + cost_pt
-
-    for pool in quote.group_labor_pools:
-        lc = pool.labor_center or "unknown"
-        tag_id = str(pool.tag_id) if pool.tag_id else None
-        tag_name = tags.get(tag_id, "Untagged") if tag_id else None
-
-        for m in pool.members:
-            hours_pt = _d(m.hours_pt)
-            hours_by_lc[lc] = hours_by_lc.get(lc, Decimal("0")) + hours_pt
-            if tag_name:
-                hours_by_tag[tag_name] = hours_by_tag.get(tag_name, Decimal("0")) + hours_pt
 
     # ── Three cost group totals ──────────────────────────────────────────
     material_total = sum(
