@@ -425,9 +425,11 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
     for species_key, total_bdft in species_total_bdft.items():
         price = prices.get(species_key, Decimal("0"))
 
+        is_new_block = False
         if species_key in existing_blocks:
             block = existing_blocks.pop(species_key)
         else:
+            is_new_block = True
             block = QuoteBlock(
                 quote_id=quote.id,
                 sort_order=0,
@@ -446,10 +448,11 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
 
         await db.flush()
 
-        # Build member map for this block
-        existing_members: dict[str, QuoteBlockMember] = {
-            str(m.product_id): m for m in block.members
-        }
+        # Build member map for this block (new blocks have no members yet)
+        existing_members: dict[str, QuoteBlockMember] = (
+            {} if is_new_block
+            else {str(m.product_id): m for m in block.members}
+        )
 
         # Determine which products need members
         for option in quote.options:
@@ -474,7 +477,8 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
                         cost_per_unit=member_cost,
                     )
                     db.add(m)
-                    block.members.append(m)
+                    # Don't append to block.members — triggers lazy load in async.
+                    # db.add(m) with FK is sufficient; load_full_quote reloads eagerly.
 
         # Remove any remaining stale members
         for stale_m in existing_members.values():
@@ -551,10 +555,12 @@ async def manage_rate_labor_pipeline(db: AsyncSession, quote: Quote) -> None:
     for lc, cfg in needed_lcs.items():
         products = lc_products[lc]
 
+        is_new_block = False
         if lc in existing_blocks:
             block = existing_blocks[lc]
             # Don't overwrite rate_value — user may have customized
         else:
+            is_new_block = True
             block = QuoteBlock(
                 quote_id=quote.id,
                 sort_order=0,
@@ -573,10 +579,11 @@ async def manage_rate_labor_pipeline(db: AsyncSession, quote: Quote) -> None:
 
         await db.flush()
 
-        # Sync members: add missing, remove stale
-        existing_members: dict[str, QuoteBlockMember] = {
-            str(m.product_id): m for m in block.members
-        }
+        # Sync members: add missing, remove stale (new blocks have no members yet)
+        existing_members: dict[str, QuoteBlockMember] = (
+            {} if is_new_block
+            else {str(m.product_id): m for m in block.members}
+        )
         needed_pids = {str(p.id) for p in products}
 
         # Remove stale members
@@ -680,10 +687,12 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
     for stone_key, total_sqft in stone_total_sqft.items():
         rate = cost_per_sqft.get(stone_key, Decimal("0"))
 
+        is_new_block = False
         if stone_key in existing_blocks:
             block = existing_blocks.pop(stone_key)
             block.cost_per_unit = float(rate) if rate else None
         else:
+            is_new_block = True
             block = QuoteBlock(
                 quote_id=quote.id,
                 sort_order=0,
@@ -702,10 +711,11 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
 
         await db.flush()
 
-        # Sync members
-        existing_members: dict[str, QuoteBlockMember] = {
-            str(m.product_id): m for m in block.members
-        }
+        # Sync members (new blocks have no members yet)
+        existing_members: dict[str, QuoteBlockMember] = (
+            {} if is_new_block
+            else {str(m.product_id): m for m in block.members}
+        )
 
         needed_pids = set()
         for option in quote.options:
@@ -721,7 +731,8 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
                                 product_id=product.id,
                             )
                             db.add(m)
-                            block.members.append(m)
+                            # Don't append to block.members — triggers lazy load in async.
+                    # db.add(m) with FK is sufficient; load_full_quote reloads eagerly.
 
         # Remove stale members
         for pid, m in existing_members.items():
