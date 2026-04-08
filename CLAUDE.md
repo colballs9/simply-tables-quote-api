@@ -196,7 +196,7 @@ The frontend never computes. It reads computed values from the API.
 A preset can include product specs, cost blocks, labor blocks, or any combination. "Save selection as preset" writes to `presets` + `preset_blocks`. A preset applied to a product creates new blocks on that product. This is more flexible than the sheet's column-per-preset approach.
 
 ### Future: Claude intelligence
-The schema is designed so historical quotes become training data. Once enough quotes are stored, Claude can query similar products (by material type, size range, base type) and suggest hours, presets, and pricing based on historical patterns. No special tables needed — just queries against `products`, `cost_blocks`, and `labor_blocks`.
+The schema is designed so historical quotes become training data. Once enough quotes are stored, Claude can query similar products (by material type, size range, base type) and suggest hours, presets, and pricing based on historical patterns. No special tables needed — just queries against `products`, `quote_blocks`, and `quote_block_members`.
 
 ---
 

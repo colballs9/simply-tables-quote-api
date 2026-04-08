@@ -1,5 +1,8 @@
 # Simply Tables Quote App — Full Build Spec
 
+> **HISTORICAL DOCUMENT (April 6, 2026)**
+> This spec describes the pre-Phase 2 architecture. Phase 2 migration (006) replaced per-product `cost_blocks`/`labor_blocks` and `group_cost_pools`/`group_labor_pools` with unified `quote_blocks` + `quote_block_members`. Refer to `CLAUDE.md`, `BUILD_PLAN.md`, and `DEPLOYMENT_NOTES.md` for current architecture.
+
 **Created:** April 6, 2026
 **Context:** This spec was produced after analyzing a real quote (Farmhouse Kitchen 0737) against the existing app. It covers every gap identified plus architectural additions discussed with Colin.
 **Implementation order:** Staged, each section is independent and testable before moving to the next.

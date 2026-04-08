@@ -1,5 +1,7 @@
 # Phase 2 Build Plan — Quote Block Architecture Refactor
 
+> **COMPLETED April 7, 2026.** All phases (2A–2F) implemented, migration 006 run on Cloud SQL, deployed to Cloud Run. This document preserved as reference for the design decisions made.
+
 ## Goal
 Replace the per-product `cost_blocks` / `labor_blocks` tables with a quote-level
 `quote_blocks` table and a `quote_block_members` junction. Add a `system_defaults`
