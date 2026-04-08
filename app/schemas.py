@@ -180,6 +180,7 @@ class QuoteBlockUpdate(BaseModel):
     tag_id: Optional[uuid.UUID] = None
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None
+    block_type: Optional[str] = None      # unit | group | rate
     label: Optional[str] = None
     # Cost fields
     cost_category: Optional[str] = None
