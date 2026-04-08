@@ -53,6 +53,9 @@ export default function RatesRow({ products, activeOption, onQuoteUpdate }) {
 function RateLine({ row, products, activeOption, onQuoteUpdate }) {
   return (
     <>
+      <div className="canvas-cell canvas-cell--label canvas-cell--pricing-label">
+        <span className="canvas-pricing-label">{row.label}</span>
+      </div>
       {products.map(product => (
         <RateCell
           key={product.id}

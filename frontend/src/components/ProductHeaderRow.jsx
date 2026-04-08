@@ -4,6 +4,9 @@ import ProductColumn from './ProductColumn'
 export default function ProductHeaderRow({ products: productList, activeOption, onQuoteUpdate, onAddProduct }) {
   return (
     <>
+      {/* Label column header */}
+      <div className="canvas-cell canvas-cell--header canvas-cell--label" />
+
       {/* Product column headers */}
       {productList.map(product => (
         <ProductColumn

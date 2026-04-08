@@ -35,6 +35,9 @@ export default function PricingRow({ products, activeOption, onQuoteUpdate }) {
 function HourlyRateLine({ products, activeOption, onQuoteUpdate }) {
   return (
     <>
+      <div className="canvas-cell canvas-cell--label canvas-cell--pricing-label">
+        <span className="canvas-pricing-label">Hourly Rate</span>
+      </div>
       {products.map(product => (
         <HourlyRateCell
           key={product.id}
@@ -90,7 +93,9 @@ function HourlyRateCell({ product, optionId, onQuoteUpdate }) {
 function PricingLine({ row, products }) {
   return (
     <>
-      {/* Value cells */}
+      <div className="canvas-cell canvas-cell--label canvas-cell--pricing-label">
+        <span className="canvas-pricing-label">{row.label}</span>
+      </div>
       {products.map(product => (
         <div key={product.id} className="canvas-cell canvas-cell--value canvas-cell--pricing-value">
           <span className={`canvas-pricing-value canvas-pricing-value--${row.accent}`}>

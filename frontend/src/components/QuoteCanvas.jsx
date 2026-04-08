@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { products } from '../api/client'
+import { Plus } from 'lucide-react'
+import { products, quoteBlocks } from '../api/client'
 import ProductHeaderRow from './ProductHeaderRow'
 import BlockRow from './BlockRow'
 import RatesRow from './RatesRow'
 import PricingRow from './PricingRow'
 
-// Stable sort: by sort_order first, then by id (string compare for UUIDs — stable across renders)
 function stableSort(items) {
   return [...items].sort((a, b) => {
     const aSort = Number.isFinite(a.sort_order) ? a.sort_order : 0
@@ -19,7 +19,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const [error, setError] = useState(null)
   const productList = activeOption?.products || []
 
-  // Memoize sorted lists so child components get stable references
   const sortedProducts = useMemo(() => stableSort(productList), [productList])
 
   const allBlocks = quote?.quote_blocks || []
@@ -51,6 +50,34 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
     }
   }
 
+  async function handleAddBlock(domain) {
+    try {
+      const payload = domain === 'cost'
+        ? {
+            block_domain: 'cost',
+            block_type: 'unit',
+            label: 'New Cost',
+            cost_category: 'unit_cost',
+            multiplier_type: 'fixed',
+            cost_per_unit: 0,
+            units_per_product: 1,
+            product_ids: sortedProducts.map(p => p.id),
+          }
+        : {
+            block_domain: 'labor',
+            block_type: 'unit',
+            label: 'New Labor',
+            labor_center: 'LC100',
+            hours_per_unit: 0,
+            product_ids: sortedProducts.map(p => p.id),
+          }
+      const updated = await quoteBlocks.create(quote.id, payload)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to add block:', err)
+    }
+  }
+
   return (
     <div className="canvas-grid-wrapper">
       {error && (
@@ -61,7 +88,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
       <div
         className="canvas-grid"
         style={{
-          gridTemplateColumns: `repeat(${sortedProducts.length}, 200px) auto`,
+          gridTemplateColumns: `240px repeat(${sortedProducts.length}, 200px) auto`,
         }}
       >
         {/* Product header row */}
@@ -93,6 +120,13 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           />
         ))}
 
+        {/* Add cost block row */}
+        <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
+          <button className="canvas-add-btn canvas-add-btn--cost" onClick={() => handleAddBlock('cost')}>
+            <Plus size={13} /> Add Cost Block
+          </button>
+        </div>
+
         {/* Labor blocks section header */}
         <div className="canvas-section-header canvas-section-header--labor" style={{ gridColumn: '1 / -1' }}>
           <span>Labor Blocks</span>
@@ -113,6 +147,13 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
             onQuoteUpdate={onQuoteUpdate}
           />
         ))}
+
+        {/* Add labor block row */}
+        <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
+          <button className="canvas-add-btn canvas-add-btn--labor" onClick={() => handleAddBlock('labor')}>
+            <Plus size={13} /> Add Labor Block
+          </button>
+        </div>
 
         {/* Rates section (collapsible) */}
         <RatesRow products={sortedProducts} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />

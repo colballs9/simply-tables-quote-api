@@ -1,5 +1,8 @@
 import { useState, useRef } from 'react'
+import { Trash2 } from 'lucide-react'
 import { quoteBlocks } from '../api/client'
+import BlockRowCost from './BlockRowCost'
+import BlockRowLabor from './BlockRowLabor'
 
 function formatCost(val) {
   if (val == null) return '--'
@@ -14,15 +17,29 @@ function formatHours(val) {
 export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
   const isCost = block.block_domain === 'cost'
   const isUnit = block.block_type === 'unit'
-  const isGroup = block.block_type === 'group'
   const memberMap = {}
   ;(block.members || []).forEach(m => {
     memberMap[m.product_id] = m
   })
 
-  // Build a product lookup for quantity (needed to compute PT from PP)
-  const productMap = {}
-  products.forEach(p => { productMap[p.id] = p })
+  async function handleDeleteBlock() {
+    if (block.is_builtin) return
+    try {
+      const updated = await quoteBlocks.delete(block.id)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to delete block:', err)
+    }
+  }
+
+  async function handleBlockUpdate(data) {
+    try {
+      const updated = await quoteBlocks.update(block.id, data)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to update block:', err)
+    }
+  }
 
   async function toggleMember(productId) {
     const isMember = !!memberMap[productId]
@@ -38,6 +55,22 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
 
   return (
     <>
+      {/* Label cell — sticky left column */}
+      <div className={`canvas-cell canvas-cell--label canvas-cell--block ${isCost ? 'canvas-cell--cost' : 'canvas-cell--labor'}`}>
+        <div className="canvas-block-label-content">
+          {isCost ? (
+            <BlockRowCost block={block} onBlockUpdate={handleBlockUpdate} />
+          ) : (
+            <BlockRowLabor block={block} onBlockUpdate={handleBlockUpdate} />
+          )}
+          {!block.is_builtin && (
+            <button className="canvas-block-delete" onClick={handleDeleteBlock} title="Delete block">
+              <Trash2 size={11} />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Member cells for each product */}
       {products.map(product => {
         const member = memberMap[product.id]
@@ -92,7 +125,7 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
         )
       })}
 
-      {/* Spacer for the add-column */}
+      {/* Spacer */}
       <div className="canvas-cell canvas-cell--spacer" />
     </>
   )
@@ -100,8 +133,6 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
 
 
 function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
-  // For cost blocks: editable cost_per_unit (member override or block-level)
-  // For labor blocks: editable hours_per_unit (member override or block-level)
   const effectiveValue = isCost
     ? (member.cost_per_unit ?? block.cost_per_unit ?? '')
     : (member.hours_per_unit ?? block.hours_per_unit ?? '')
@@ -109,7 +140,6 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
   const [localVal, setLocalVal] = useState(String(effectiveValue))
   const focusRef = useRef(null)
 
-  // Sync from props when not focused
   const prevValRef = useRef(effectiveValue)
   if (effectiveValue !== prevValRef.current && !focusRef.current) {
     setLocalVal(String(effectiveValue ?? ''))
@@ -121,7 +151,6 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
     const val = parseFloat(localVal)
     if (isNaN(val)) return
     const field = isCost ? 'cost_per_unit' : 'hours_per_unit'
-    // Only save if changed from the effective value
     if (val === effectiveValue) return
     try {
       const updated = await quoteBlocks.updateMember(block.id, product.id, { [field]: val })
