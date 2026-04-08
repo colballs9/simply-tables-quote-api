@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { products } from '../api/client'
+import MaterialSearch from './MaterialSearch'
 
 const MATERIAL_TYPES = ['Hardwood', 'Stone', 'Live Edge', 'Laminate', 'Wood Edge Laminate', 'Outdoor', 'Other']
 const SHAPES = ['Standard', 'DIA', 'Custom Shape', 'Base Only']
@@ -160,7 +161,17 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
       </div>
       {specsOpen && (
         <div className="pcol-fields">
-          <PcolSelect label="Material" value={product.material_type || MATERIAL_TYPES[0]} options={MATERIAL_TYPES} onChange={v => saveSelect('material_type', v)} disabled={saving} />
+          <PcolSelect label="Material Group" value={product.material_type || MATERIAL_TYPES[0]} options={MATERIAL_TYPES} onChange={v => saveSelect('material_type', v)} disabled={saving} />
+          <div className="pcol-field">
+            <label>Material</label>
+            <MaterialSearch
+              materialType={product.material_type}
+              value={locals.material_detail}
+              onChange={val => setLocal('material_detail', val)}
+              onBlur={() => saveText('material_detail')}
+              disabled={saving}
+            />
+          </div>
           <PcolNum label="Qty" field="quantity" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('quantity')} step="1" disabled={saving} />
           <PcolNum label="Width" field="width" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('width')} step="0.25" disabled={saving} />
           <PcolNum label="Length" field="length" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('length')} step="0.25" disabled={saving} />
@@ -173,7 +184,6 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
             <PcolText label="Height (in)" field="height_input" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveText('height_input')} disabled={saving} />
           )}
           <PcolSelect label="Base" value={product.base_type || BASE_TYPES[0]} options={BASE_TYPES} onChange={v => saveSelect('base_type', v)} disabled={saving} />
-          <PcolText label="Material Detail" field="material_detail" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveText('material_detail')} placeholder="e.g. Walnut" disabled={saving} />
           {(product.material_type === 'Hardwood' || product.material_type === 'Live Edge') && (
             <PcolSelect label="Thickness" value={product.lumber_thickness || THICKNESSES[0]} options={THICKNESSES} onChange={v => saveSelect('lumber_thickness', v)} disabled={saving} optionLabels={THICKNESSES.map(t => t || '\u2014')} />
           )}

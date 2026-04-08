@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
-import { quotes as quotesApi } from '../api/client'
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { quotes as quotesApi, quoteBlocks } from '../api/client'
+import BlockRowCost from './BlockRowCost'
+import BlockRowLabor from './BlockRowLabor'
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -26,6 +28,16 @@ function fmtH(val) {
 function fmtRate(val) {
   if (val == null) return '\u2014'
   return '$' + Number(val).toFixed(2) + '/hr'
+}
+
+// Stable sort: by sort_order first, then by id
+function stableSort(items) {
+  return [...items].sort((a, b) => {
+    const aSort = Number.isFinite(a.sort_order) ? a.sort_order : 0
+    const bSort = Number.isFinite(b.sort_order) ? b.sort_order : 0
+    if (aSort !== bSort) return aSort - bSort
+    return (a.id || '').localeCompare(b.id || '')
+  })
 }
 
 // ── Sub-components ───────────────────────────────────────────────────
@@ -90,15 +102,65 @@ function QuoteStats({ activeOption }) {
   )
 }
 
-// ── Block Configs ───────────────────────────────────────────────────
+// ── Block Configs (Editable) ────────────────────────────────────────
 
-function BlockConfigs({ quote }) {
-  const [expanded, setExpanded] = useState(false)
+function BlockConfigs({ quote, activeOption, onQuoteUpdate }) {
+  const [expanded, setExpanded] = useState(true)
   const allBlocks = quote?.quote_blocks || []
-  const costBlocks = allBlocks.filter(b => b.block_domain === 'cost')
-  const laborBlocks = allBlocks.filter(b => b.block_domain === 'labor')
+  const costBlocks = stableSort(allBlocks.filter(b => b.block_domain === 'cost'))
+  const laborBlocks = stableSort(allBlocks.filter(b => b.block_domain === 'labor'))
 
-  if (allBlocks.length === 0) return null
+  const sortedProducts = useMemo(() => {
+    const prods = activeOption?.products || []
+    return stableSort(prods)
+  }, [activeOption])
+
+  async function handleAddBlock(domain) {
+    try {
+      const payload = domain === 'cost'
+        ? {
+            block_domain: 'cost',
+            block_type: 'unit',
+            label: 'New Cost',
+            cost_category: 'unit_cost',
+            multiplier_type: 'fixed',
+            cost_per_unit: 0,
+            units_per_product: 1,
+            product_ids: sortedProducts.map(p => p.id),
+          }
+        : {
+            block_domain: 'labor',
+            block_type: 'unit',
+            label: 'New Labor',
+            labor_center: 'LC100',
+            hours_per_unit: 0,
+            product_ids: sortedProducts.map(p => p.id),
+          }
+      const updated = await quoteBlocks.create(quote.id, payload)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to add block:', err)
+    }
+  }
+
+  async function handleBlockUpdate(blockId, data) {
+    try {
+      const updated = await quoteBlocks.update(blockId, data)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to update block:', err)
+    }
+  }
+
+  async function handleDeleteBlock(block) {
+    if (block.is_builtin) return
+    try {
+      const updated = await quoteBlocks.delete(block.id)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to delete block:', err)
+    }
+  }
 
   return (
     <div className="canvas-panel">
@@ -114,61 +176,54 @@ function BlockConfigs({ quote }) {
       </div>
 
       {expanded && (
-        <>
-          {costBlocks.length > 0 && (
-            <>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--cost-text)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '4px 0' }}>
-                Cost Blocks
-              </div>
-              {costBlocks.map(b => (
-                <BlockConfigCard key={b.id} block={b} domain="cost" />
-              ))}
-            </>
+        <div className="sp-block-configs-scroll">
+          {/* Cost Blocks */}
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--cost-text)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '4px 0' }}>
+            Cost Blocks
+          </div>
+          {costBlocks.length === 0 && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '4px 0' }}>No cost blocks yet</div>
           )}
-          {laborBlocks.length > 0 && (
-            <>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--hours-text)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '6px 0 4px' }}>
-                Labor Blocks
+          {costBlocks.map(b => (
+            <div key={b.id} className="sp-block-config-card sp-block-config-card--editable">
+              <div className="sp-block-config-edit-row">
+                <BlockRowCost block={b} onBlockUpdate={(data) => handleBlockUpdate(b.id, data)} />
+                {!b.is_builtin && (
+                  <button className="sp-block-delete-btn" onClick={() => handleDeleteBlock(b)} title="Delete block">
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
-              {laborBlocks.map(b => (
-                <BlockConfigCard key={b.id} block={b} domain="labor" />
-              ))}
-            </>
+            </div>
+          ))}
+          <button className="canvas-add-btn canvas-add-btn--cost" onClick={() => handleAddBlock('cost')} style={{ marginTop: 4, width: '100%', justifyContent: 'center' }}>
+            <Plus size={13} /> Add Cost Block
+          </button>
+
+          {/* Labor Blocks */}
+          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--hours-text)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '10px 0 4px' }}>
+            Labor Blocks
+          </div>
+          {laborBlocks.length === 0 && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '4px 0' }}>No labor blocks yet</div>
           )}
-        </>
+          {laborBlocks.map(b => (
+            <div key={b.id} className="sp-block-config-card sp-block-config-card--editable">
+              <div className="sp-block-config-edit-row">
+                <BlockRowLabor block={b} onBlockUpdate={(data) => handleBlockUpdate(b.id, data)} />
+                {!b.is_builtin && (
+                  <button className="sp-block-delete-btn" onClick={() => handleDeleteBlock(b)} title="Delete block">
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          <button className="canvas-add-btn canvas-add-btn--labor" onClick={() => handleAddBlock('labor')} style={{ marginTop: 4, width: '100%', justifyContent: 'center' }}>
+            <Plus size={13} /> Add Labor Block
+          </button>
+        </div>
       )}
-    </div>
-  )
-}
-
-function BlockConfigCard({ block, domain }) {
-  const isCost = domain === 'cost'
-  const badgeClass = isCost ? 'cost' : 'hours'
-  const fields = []
-
-  if (block.block_type) fields.push({ k: 'Type', v: block.block_type })
-  if (isCost && block.cost_category) fields.push({ k: 'Category', v: block.cost_category })
-  if (isCost && block.multiplier_type) fields.push({ k: 'Multiplier', v: block.multiplier_type })
-  if (!isCost && block.labor_center) fields.push({ k: 'Center', v: `${block.labor_center} ${LC_LABELS[block.labor_center] || ''}` })
-  if (block.rate_type) fields.push({ k: 'Rate Type', v: block.rate_type })
-
-  return (
-    <div className="sp-block-config-card">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-        <span className={`pool-tag ${badgeClass}`} style={{ fontSize: '0.58rem', padding: '0px 5px' }}>
-          {block.block_type}
-        </span>
-        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-          {block.label || 'Untitled'}
-        </span>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
-        {fields.map(f => (
-          <span key={f.k} style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            {f.k}: <span style={{ color: 'var(--text-secondary)' }}>{f.v}</span>
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
@@ -226,8 +281,8 @@ export default function SidePanel({ quote, activeOption, onOptionSelect, onQuote
       {/* ── Quote Stats ── */}
       <QuoteStats activeOption={activeOption} />
 
-      {/* ── Block Configs ── */}
-      <BlockConfigs quote={quote} />
+      {/* ── Block Configs (Editable) ── */}
+      <BlockConfigs quote={quote} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />
 
       {/* ── Job Summary ── */}
       <div className="canvas-panel">

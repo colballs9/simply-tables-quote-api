@@ -53,9 +53,6 @@ export default function RatesRow({ products, activeOption, onQuoteUpdate }) {
 function RateLine({ row, products, activeOption, onQuoteUpdate }) {
   return (
     <>
-      <div className="canvas-cell canvas-cell--label canvas-cell--pricing-label">
-        <span className="canvas-pricing-label">{row.label}</span>
-      </div>
       {products.map(product => (
         <RateCell
           key={product.id}
@@ -111,6 +108,7 @@ function RateCell({ product, row, optionId, onQuoteUpdate }) {
           onChange={e => setLocalVal(e.target.value)}
           onFocus={() => { focusRef.current = true }}
           onBlur={saveValue}
+          title={row.label}
         />
         {isPercent && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>%</span>}
       </div>
