@@ -1228,6 +1228,67 @@ a:hover { color: var(--green-200); }
 .canvas-section-header--labor span { color: var(--hours-text); }
 .canvas-section-header--pricing span { color: var(--green-300); }
 
+/* ── Sub-section Headers (Material Costs, labor centers, etc.) ── */
+
+.canvas-subsection-header {
+  padding: 4px 8px 3px 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-subsection-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.canvas-subsection-header--cost .canvas-subsection-label { color: var(--cost-text); }
+.canvas-subsection-header--labor .canvas-subsection-label { color: var(--hours-text); }
+
+/* Empty / inactive sub-sections: smaller and greyed out */
+.canvas-subsection-header--empty {
+  padding: 2px 8px 2px 20px;
+}
+
+.canvas-subsection-header--empty .canvas-subsection-label {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Inline "+" button for empty sub-sections */
+.canvas-subsection-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.canvas-subsection-add-btn:hover {
+  opacity: 1;
+}
+
+.canvas-subsection-add-btn--cost:hover {
+  color: var(--cost-text);
+  border-color: var(--cost-border);
+}
+
+.canvas-subsection-add-btn--labor:hover {
+  color: var(--hours-text);
+  border-color: var(--hours-border);
+}
+
 /* ── Product Header Cells ── */
 
 .canvas-product-header-top {

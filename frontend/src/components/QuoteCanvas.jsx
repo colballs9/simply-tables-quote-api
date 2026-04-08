@@ -15,6 +15,36 @@ function stableSort(items) {
   })
 }
 
+/* ── Section definitions ── */
+
+const COST_SECTIONS = [
+  { key: 'material', label: 'Material Costs', categories: ['species', 'stone'] },
+  { key: 'base', label: 'Base Costs', categories: ['stock_base', 'custom_base', 'powder_coat', 'stock_base_shipping'] },
+  { key: 'project', label: 'Project Costs', categories: ['unit_cost', 'group_cost', 'misc', 'consumables'] },
+]
+
+const LABOR_SECTIONS = [
+  { lc: 'LC101', label: '101 Processing' },
+  { lc: 'LC102', label: '102 Belt Sanding' },
+  { lc: 'LC103', label: '103 Cutting' },
+  { lc: 'LC104', label: '104 CNC' },
+  { lc: 'LC105', label: '105 Wood Fab' },
+  { lc: 'LC106', label: '106 Finish Sanding' },
+  { lc: 'LC107', label: '107 Metal Fab' },
+  { lc: 'LC108', label: '108 Stone Fab' },
+  { lc: 'LC109', label: '109 Finishing' },
+  { lc: 'LC110', label: '110 Assembly' },
+  { lc: 'LC100', label: '100 Material Handling' },
+  { lc: 'LC111', label: '111 Packing + Loading' },
+]
+
+/* Default cost_category when adding a block to each cost section */
+const COST_SECTION_DEFAULTS = {
+  material: 'species',
+  base: 'stock_base',
+  project: 'unit_cost',
+}
+
 export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const [error, setError] = useState(null)
   const productList = activeOption?.products || []
@@ -22,14 +52,30 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const sortedProducts = useMemo(() => stableSort(productList), [productList])
 
   const allBlocks = quote?.quote_blocks || []
-  const costBlocks = useMemo(
-    () => stableSort(allBlocks.filter(b => b.block_domain === 'cost')),
-    [allBlocks]
-  )
-  const laborBlocks = useMemo(
-    () => stableSort(allBlocks.filter(b => b.block_domain === 'labor')),
-    [allBlocks]
-  )
+
+  /* Group cost blocks by section */
+  const costBlocksBySection = useMemo(() => {
+    const costBlocks = allBlocks.filter(b => b.block_domain === 'cost')
+    const grouped = {}
+    for (const section of COST_SECTIONS) {
+      grouped[section.key] = stableSort(
+        costBlocks.filter(b => section.categories.includes(b.cost_category))
+      )
+    }
+    return grouped
+  }, [allBlocks])
+
+  /* Group labor blocks by labor_center */
+  const laborBlocksByLC = useMemo(() => {
+    const laborBlocks = allBlocks.filter(b => b.block_domain === 'labor')
+    const grouped = {}
+    for (const section of LABOR_SECTIONS) {
+      grouped[section.lc] = stableSort(
+        laborBlocks.filter(b => b.labor_center === section.lc)
+      )
+    }
+    return grouped
+  }, [allBlocks])
 
   async function handleAddProduct() {
     if (!activeOption) {
@@ -50,27 +96,35 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
     }
   }
 
-  async function handleAddBlock(domain) {
+  async function handleAddCostBlock(sectionKey) {
     try {
-      const payload = domain === 'cost'
-        ? {
-            block_domain: 'cost',
-            block_type: 'unit',
-            label: 'New Cost',
-            cost_category: 'unit_cost',
-            multiplier_type: 'fixed',
-            cost_per_unit: 0,
-            units_per_product: 1,
-            product_ids: sortedProducts.map(p => p.id),
-          }
-        : {
-            block_domain: 'labor',
-            block_type: 'unit',
-            label: 'New Labor',
-            labor_center: 'LC100',
-            hours_per_unit: 0,
-            product_ids: sortedProducts.map(p => p.id),
-          }
+      const payload = {
+        block_domain: 'cost',
+        block_type: 'unit',
+        label: 'New Cost',
+        cost_category: COST_SECTION_DEFAULTS[sectionKey] || 'unit_cost',
+        multiplier_type: 'fixed',
+        cost_per_unit: 0,
+        units_per_product: 1,
+        product_ids: sortedProducts.map(p => p.id),
+      }
+      const updated = await quoteBlocks.create(quote.id, payload)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to add block:', err)
+    }
+  }
+
+  async function handleAddLaborBlock(laborCenter) {
+    try {
+      const payload = {
+        block_domain: 'labor',
+        block_type: 'unit',
+        label: 'New Labor',
+        labor_center: laborCenter,
+        hours_per_unit: 0,
+        product_ids: sortedProducts.map(p => p.id),
+      }
       const updated = await quoteBlocks.create(quote.id, payload)
       onQuoteUpdate(updated)
     } catch (err) {
@@ -99,61 +153,105 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           onAddProduct={handleAddProduct}
         />
 
-        {/* Cost blocks section header */}
+        {/* ═══ COST BLOCKS ═══ */}
         <div className="canvas-section-header canvas-section-header--cost" style={{ gridColumn: '1 / -1' }}>
           <span>Cost Blocks</span>
         </div>
 
-        {costBlocks.length === 0 && (
-          <div className="canvas-empty-section" style={{ gridColumn: '1 / -1' }}>
-            No cost blocks yet
-          </div>
-        )}
+        {COST_SECTIONS.map(section => {
+          const blocks = costBlocksBySection[section.key] || []
+          const isEmpty = blocks.length === 0
+          return (
+            <div key={section.key} className="canvas-subsection" style={{ gridColumn: '1 / -1', display: 'contents' }}>
+              {/* Sub-section header */}
+              <div
+                className={`canvas-subsection-header canvas-subsection-header--cost ${isEmpty ? 'canvas-subsection-header--empty' : ''}`}
+                style={{ gridColumn: '1 / -1' }}
+              >
+                <span className="canvas-subsection-label">{section.label}</span>
+                {isEmpty && (
+                  <button
+                    className="canvas-subsection-add-btn canvas-subsection-add-btn--cost"
+                    onClick={() => handleAddCostBlock(section.key)}
+                    title={`Add ${section.label.toLowerCase()} block`}
+                  >
+                    <Plus size={12} />
+                  </button>
+                )}
+              </div>
 
-        {costBlocks.map(block => (
-          <BlockRow
-            key={block.id}
-            block={block}
-            products={sortedProducts}
-            quoteId={quote.id}
-            onQuoteUpdate={onQuoteUpdate}
-          />
-        ))}
+              {/* Blocks in this section */}
+              {blocks.map(block => (
+                <BlockRow
+                  key={block.id}
+                  block={block}
+                  products={sortedProducts}
+                  quoteId={quote.id}
+                  onQuoteUpdate={onQuoteUpdate}
+                />
+              ))}
 
-        {/* Add cost block row */}
-        <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
-          <button className="canvas-add-btn canvas-add-btn--cost" onClick={() => handleAddBlock('cost')}>
-            <Plus size={13} /> Add Cost Block
-          </button>
-        </div>
+              {/* Add block button (shown when section has blocks) */}
+              {!isEmpty && (
+                <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
+                  <button className="canvas-add-btn canvas-add-btn--cost" onClick={() => handleAddCostBlock(section.key)}>
+                    <Plus size={13} /> Add Block
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
 
-        {/* Labor blocks section header */}
+        {/* ═══ HOURS BLOCKS ═══ */}
         <div className="canvas-section-header canvas-section-header--labor" style={{ gridColumn: '1 / -1' }}>
-          <span>Labor Blocks</span>
+          <span>Hours Blocks</span>
         </div>
 
-        {laborBlocks.length === 0 && (
-          <div className="canvas-empty-section" style={{ gridColumn: '1 / -1' }}>
-            No labor blocks yet
-          </div>
-        )}
+        {LABOR_SECTIONS.map(section => {
+          const blocks = laborBlocksByLC[section.lc] || []
+          const isEmpty = blocks.length === 0
+          return (
+            <div key={section.lc} className="canvas-subsection" style={{ gridColumn: '1 / -1', display: 'contents' }}>
+              {/* Sub-section header */}
+              <div
+                className={`canvas-subsection-header canvas-subsection-header--labor ${isEmpty ? 'canvas-subsection-header--empty' : ''}`}
+                style={{ gridColumn: '1 / -1' }}
+              >
+                <span className="canvas-subsection-label">{section.label}</span>
+                {isEmpty && (
+                  <button
+                    className="canvas-subsection-add-btn canvas-subsection-add-btn--labor"
+                    onClick={() => handleAddLaborBlock(section.lc)}
+                    title={`Add ${section.label} block`}
+                  >
+                    <Plus size={12} />
+                  </button>
+                )}
+              </div>
 
-        {laborBlocks.map(block => (
-          <BlockRow
-            key={block.id}
-            block={block}
-            products={sortedProducts}
-            quoteId={quote.id}
-            onQuoteUpdate={onQuoteUpdate}
-          />
-        ))}
+              {/* Blocks in this section */}
+              {blocks.map(block => (
+                <BlockRow
+                  key={block.id}
+                  block={block}
+                  products={sortedProducts}
+                  quoteId={quote.id}
+                  onQuoteUpdate={onQuoteUpdate}
+                />
+              ))}
 
-        {/* Add labor block row */}
-        <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
-          <button className="canvas-add-btn canvas-add-btn--labor" onClick={() => handleAddBlock('labor')}>
-            <Plus size={13} /> Add Labor Block
-          </button>
-        </div>
+              {/* Add block button (shown when section has blocks) */}
+              {!isEmpty && (
+                <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
+                  <button className="canvas-add-btn canvas-add-btn--labor" onClick={() => handleAddLaborBlock(section.lc)}>
+                    <Plus size={13} /> Add Block
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {/* Rates section (collapsible) */}
         <RatesRow products={sortedProducts} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />
