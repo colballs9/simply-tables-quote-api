@@ -1,17 +1,10 @@
 import { useState, useRef, useCallback } from 'react'
 import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
-const COST_CATEGORIES = [
-  { value: 'misc', label: 'Misc' },
-  { value: 'consumables', label: 'Consumables' },
-  { value: 'stock_base_shipping', label: 'SB Shipping' },
-  { value: 'unit_cost', label: 'Unit Cost' },
-  { value: 'group_cost', label: 'Group Cost' },
-  { value: 'species', label: 'Species' },
-  { value: 'stone', label: 'Stone' },
-  { value: 'stock_base', label: 'Stock Base' },
-  { value: 'powder_coat', label: 'Powder Coat' },
-  { value: 'custom_base', label: 'Custom Base' },
+const BLOCK_TYPES = [
+  { value: 'unit', label: 'Unit Cost' },
+  { value: 'group', label: 'Group Cost' },
+  { value: 'rate', label: 'Rate Cost' },
 ]
 
 const MULTIPLIER_TYPES = [
@@ -118,11 +111,11 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
       <div className="canvas-block-fields-row">
         <select
           className="canvas-block-select"
-          value={block.cost_category || 'unit_cost'}
-          onChange={e => onBlockUpdate({ cost_category: e.target.value })}
+          value={block.block_type || 'unit'}
+          onChange={e => onBlockUpdate({ block_type: e.target.value })}
         >
-          {COST_CATEGORIES.map(c => (
-            <option key={c.value} value={c.value}>{c.label}</option>
+          {BLOCK_TYPES.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
 

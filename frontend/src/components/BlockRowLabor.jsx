@@ -1,14 +1,11 @@
 import { useState, useRef, useCallback } from 'react'
 import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
-const LC_LABELS = {
-  LC100: 'Handling', LC101: 'Processing', LC102: 'Belt Sand',
-  LC103: 'Cutting', LC104: 'CNC', LC105: 'Wood Fab',
-  LC106: 'Fin Sand', LC107: 'Metal Fab', LC108: 'Stone Fab',
-  LC109: 'Finishing', LC110: 'Assembly', LC111: 'Packing',
-}
-
-const LABOR_CENTERS = Object.entries(LC_LABELS).map(([v, l]) => ({ value: v, label: `${v} ${l}` }))
+const BLOCK_TYPES = [
+  { value: 'unit', label: 'Unit Hours' },
+  { value: 'group', label: 'Group Hours' },
+  { value: 'rate', label: 'Rate Hours' },
+]
 
 const METRIC_SOURCES = [
   { value: 'panel_sqft', label: 'Panel SqFt' },
@@ -97,30 +94,25 @@ export default function BlockRowLabor({ block, onBlockUpdate }) {
     }
   }
 
-  const typeIndicator = isGroup ? 'GRP' : isRate ? 'RATE' : 'UNIT'
-
   return (
     <div className="canvas-block-fields">
-      <div className="canvas-block-label-row">
-        <input
-          className="canvas-block-label-input"
-          value={label}
-          onChange={e => setLabel(e.target.value)}
-          onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
-          onBlur={saveLabel}
-          onKeyDown={ssLabel.onKeyDown}
-          placeholder="Label..."
-        />
-        <span className="canvas-block-type-badge">{typeIndicator}</span>
-      </div>
+      <input
+        className="canvas-block-label-input"
+        value={label}
+        onChange={e => setLabel(e.target.value)}
+        onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
+        onBlur={saveLabel}
+        onKeyDown={ssLabel.onKeyDown}
+        placeholder="Label..."
+      />
       <div className="canvas-block-fields-row">
         <select
           className="canvas-block-select"
-          value={block.labor_center || 'LC100'}
-          onChange={e => onBlockUpdate({ labor_center: e.target.value })}
+          value={block.block_type || 'unit'}
+          onChange={e => onBlockUpdate({ block_type: e.target.value })}
         >
-          {LABOR_CENTERS.map(c => (
-            <option key={c.value} value={c.value}>{c.label}</option>
+          {BLOCK_TYPES.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
 
