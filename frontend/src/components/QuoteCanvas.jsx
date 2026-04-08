@@ -15,7 +15,7 @@ function stableSort(items) {
   })
 }
 
-export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, selectedProductId, onProductSelect }) {
+export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const [error, setError] = useState(null)
   const productList = activeOption?.products || []
 
@@ -89,7 +89,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, select
       <div
         className="canvas-grid"
         style={{
-          gridTemplateColumns: `240px repeat(${sortedProducts.length}, 140px) auto`,
+          gridTemplateColumns: `240px repeat(${sortedProducts.length}, 200px) auto`,
         }}
       >
         {/* Product header row */}
@@ -98,8 +98,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, select
           activeOption={activeOption}
           onQuoteUpdate={onQuoteUpdate}
           onAddProduct={handleAddProduct}
-          selectedProductId={selectedProductId}
-          onProductSelect={onProductSelect}
         />
 
         {/* Cost blocks section header */}
@@ -163,7 +161,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate, select
           <span>Pricing</span>
         </div>
 
-        <PricingRow products={sortedProducts} />
+        <PricingRow products={sortedProducts} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />
       </div>
     </div>
   )

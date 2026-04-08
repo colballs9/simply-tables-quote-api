@@ -6,7 +6,7 @@ import SidePanel from '../components/SidePanel'
 import QuoteCanvas from '../components/QuoteCanvas'
 
 function formatPrice(val) {
-  if (!val && val !== 0) return '—'
+  if (!val && val !== 0) return '\u2014'
   return '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
@@ -20,13 +20,15 @@ export default function QuoteBuilder() {
   const [recalculating, setRecalculating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [selectedOptionId, setSelectedOptionId] = useState('')
-  const [selectedProductId, setSelectedProductId] = useState(null)
 
   // Local state for text/number inputs (save on blur, not every keystroke)
   const [localProjectName, setLocalProjectName] = useState('')
   const [localDealId, setLocalDealId] = useState('')
   const [localRepRate, setLocalRepRate] = useState('')
   const projectNameTimerRef = useRef(null)
+
+  // Track whether localDealId has been initialized from a full load
+  const dealIdInitRef = useRef(false)
 
   // Load or create quote
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function QuoteBuilder() {
       setQuote(data)
       setLocalProjectName(data.project_name || '')
       setLocalDealId(data.deal_id || '')
+      dealIdInitRef.current = true
       setLocalRepRate(String(data.rep_rate ?? 0.08))
       if (!selectedOptionId && data.options?.[0]?.id) {
         setSelectedOptionId(data.options[0].id)
@@ -64,6 +67,7 @@ export default function QuoteBuilder() {
       setQuote(data)
       setLocalProjectName(data.project_name || '')
       setLocalDealId(data.deal_id || '')
+      dealIdInitRef.current = true
       setLocalRepRate(String(data.rep_rate ?? 0.08))
       if (data.options?.[0]?.id) {
         setSelectedOptionId(data.options[0].id)
@@ -78,8 +82,7 @@ export default function QuoteBuilder() {
   // Generic handler that refreshes quote after any mutation
   const refreshQuote = useCallback((updatedQuote) => {
     setQuote(updatedQuote)
-    // Sync project name from server only if user isn't actively editing
-    // (the input has its own local state with debounce)
+    // Don't overwrite localDealId -- local state is authoritative until next full load
     setSelectedOptionId(prev => {
       if (!prev && updatedQuote.options?.[0]?.id) {
         return updatedQuote.options[0].id
@@ -122,6 +125,7 @@ export default function QuoteBuilder() {
     try {
       const updated = await quotes.update(quote.id, { [field]: value })
       setQuote(updated)
+      // Don't sync localDealId back -- local state is authoritative
     } catch (err) {
       console.error('Failed to update quote:', err)
       setError(err.message || 'Failed to update quote')
@@ -299,8 +303,6 @@ export default function QuoteBuilder() {
           activeOption={activeOption}
           onOptionSelect={setSelectedOptionId}
           onQuoteUpdate={refreshQuote}
-          selectedProductId={selectedProductId}
-          onProductDeselect={() => setSelectedProductId(null)}
         />
 
         <section className="quote-canvas-right">
@@ -315,8 +317,6 @@ export default function QuoteBuilder() {
             quote={quote}
             activeOption={activeOption}
             onQuoteUpdate={refreshQuote}
-            selectedProductId={selectedProductId}
-            onProductSelect={setSelectedProductId}
           />
         </section>
       </div>

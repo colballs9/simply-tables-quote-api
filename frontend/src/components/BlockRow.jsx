@@ -23,6 +23,10 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
     memberMap[m.product_id] = m
   })
 
+  // Build a product lookup for quantity (needed to compute PT from PP)
+  const productMap = {}
+  products.forEach(p => { productMap[p.id] = p })
+
   async function handleDeleteBlock() {
     if (block.is_builtin) return
     try {
@@ -93,12 +97,22 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
                 />
               ) : (
                 <div className="canvas-member-value" title="Click to remove from block">
-                  <span
-                    className={`canvas-computed ${isCost ? 'canvas-computed--cost' : 'canvas-computed--hours'}`}
-                    onClick={() => toggleMember(product.id)}
-                  >
-                    {isCost ? formatCost(member.cost_pp) : formatHours(member.hours_pp)}
-                  </span>
+                  <div className="canvas-member-value-stack">
+                    <span
+                      className={`canvas-computed ${isCost ? 'canvas-computed--cost' : 'canvas-computed--hours'}`}
+                      onClick={() => toggleMember(product.id)}
+                    >
+                      {isCost ? formatCost(member.cost_pp) : formatHours(member.hours_pp)}
+                      <span className="canvas-unit-pp-label"> pp</span>
+                    </span>
+                    <span className={`canvas-pt-value ${isCost ? 'canvas-pt-value--cost' : 'canvas-pt-value--hours'}`}>
+                      {isCost
+                        ? formatCost(member.cost_pp != null && product.quantity ? member.cost_pp * product.quantity : null)
+                        : formatHours(member.hours_pp != null && product.quantity ? member.hours_pp * product.quantity : null)
+                      }
+                      <span className="canvas-unit-pp-label"> pt</span>
+                    </span>
+                  </div>
                 </div>
               )
             ) : (
@@ -145,7 +159,6 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
     const val = parseFloat(localVal)
     if (isNaN(val)) return
     const field = isCost ? 'cost_per_unit' : 'hours_per_unit'
-    const currentMemberVal = isCost ? member.cost_per_unit : member.hours_per_unit
     // Only save if changed from the effective value
     if (val === effectiveValue) return
     try {
@@ -157,6 +170,7 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
   }
 
   const computedPP = isCost ? member.cost_pp : member.hours_pp
+  const computedPT = computedPP != null && product.quantity ? computedPP * product.quantity : null
 
   return (
     <div className="canvas-unit-cell">
@@ -173,6 +187,10 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
       <span className={`canvas-unit-pp ${isCost ? 'canvas-unit-pp--cost' : 'canvas-unit-pp--hours'}`}>
         {isCost ? formatCost(computedPP) : formatHours(computedPP)}
         <span className="canvas-unit-pp-label"> pp</span>
+      </span>
+      <span className={`canvas-pt-value ${isCost ? 'canvas-pt-value--cost' : 'canvas-pt-value--hours'}`}>
+        {isCost ? formatCost(computedPT) : formatHours(computedPT)}
+        <span className="canvas-unit-pp-label"> pt</span>
       </span>
     </div>
   )
