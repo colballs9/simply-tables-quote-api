@@ -183,17 +183,11 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
           <PcolNum label="Width" field="width" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('width')} step="0.25" disabled={saving} />
           <PcolNum label="Length" field="length" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('length')} step="0.25" disabled={saving} />
           <PcolSelect label="Shape" value={product.shape || SHAPES[0]} options={SHAPES} onChange={v => saveSelect('shape', v)} disabled={saving} />
-          {product.shape === 'Custom Shape' && (
-            <PcolText label="Shape Detail" field="shape_custom" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveText('shape_custom')} disabled={saving} />
-          )}
+          <PcolText label="Shape Detail" field="shape_custom" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveText('shape_custom')} disabled={saving} hidden={product.shape !== 'Custom Shape'} />
           <PcolSelect label="Height" value={product.height_name || HEIGHTS[0]} options={HEIGHTS} onChange={v => saveSelect('height_name', v)} disabled={saving} />
-          {product.height_name === 'Custom Height' && (
-            <PcolText label="Height (in)" field="height_input" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveText('height_input')} disabled={saving} />
-          )}
+          <PcolText label="Height (in)" field="height_input" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveText('height_input')} disabled={saving} hidden={product.height_name !== 'Custom Height'} />
           <PcolSelect label="Base" value={product.base_type || BASE_TYPES[0]} options={BASE_TYPES} onChange={v => saveSelect('base_type', v)} disabled={saving} />
-          {(product.material_type === 'Hardwood' || product.material_type === 'Live Edge') && (
-            <PcolSelect label="Thickness" value={product.lumber_thickness || THICKNESSES[0]} options={THICKNESSES} onChange={v => saveSelect('lumber_thickness', v)} disabled={saving} optionLabels={THICKNESSES.map(t => t || '\u2014')} />
-          )}
+          <PcolSelect label="Thickness" value={product.lumber_thickness || THICKNESSES[0]} options={THICKNESSES} onChange={v => saveSelect('lumber_thickness', v)} disabled={saving} optionLabels={THICKNESSES.map(t => t || '\u2014')} hidden={!(product.material_type === 'Hardwood' || product.material_type === 'Live Edge')} />
           <PcolNum label="Bases/Top" field="bases_per_top" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('bases_per_top')} step="1" disabled={saving} />
         </div>
       )}
@@ -222,10 +216,10 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
 
 // -- Sub-components for compact inputs --
 
-function PcolText({ label, field, locals, setLocal, focusRef, onBlur, placeholder, disabled }) {
+function PcolText({ label, field, locals, setLocal, focusRef, onBlur, placeholder, disabled, hidden }) {
   const origRef = useRef(null)
   return (
-    <div className="pcol-field">
+    <div className="pcol-field" style={hidden ? { visibility: 'hidden' } : undefined}>
       <label>{label}</label>
       <input
         type="text"
@@ -239,6 +233,7 @@ function PcolText({ label, field, locals, setLocal, focusRef, onBlur, placeholde
         }}
         placeholder={placeholder}
         disabled={disabled}
+        tabIndex={hidden ? -1 : undefined}
       />
     </div>
   )
@@ -266,11 +261,11 @@ function PcolNum({ label, field, locals, setLocal, focusRef, onBlur, step, disab
   )
 }
 
-function PcolSelect({ label, value, options, onChange, disabled, optionLabels }) {
+function PcolSelect({ label, value, options, onChange, disabled, optionLabels, hidden }) {
   return (
-    <div className="pcol-field">
+    <div className="pcol-field" style={hidden ? { visibility: 'hidden' } : undefined}>
       <label>{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled}>
+      <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled} tabIndex={hidden ? -1 : undefined}>
         {options.map((o, i) => <option key={o} value={o}>{optionLabels ? optionLabels[i] : o}</option>)}
       </select>
     </div>
