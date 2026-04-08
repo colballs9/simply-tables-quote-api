@@ -1,71 +1,76 @@
 /* ═══════════════════════════════════════════════════════════════
    Simply Tables Quote System — Theme
-   Dark mode. Forest green primary. Orange costs. Purple hours.
+   Light neumorphic. Green #49554C accent. Orange costs. Purple hours.
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Greens (primary) ── */
-  --green-900: #0a1f12;
-  --green-800: #122b1a;
-  --green-700: #1a3d26;
-  --green-600: #245233;
-  --green-500: #2d6b3f;
-  --green-400: #3d8c54;
-  --green-300: #5aad6f;
-  --green-200: #8fcf9c;
-  --green-100: #c8e8cf;
+  /* ── Greens (primary — based on #49554C) ── */
+  --green-900: #2a3230;
+  --green-800: #333d3a;
+  --green-700: #3d4945;
+  --green-600: #49554C;
+  --green-500: #576358;
+  --green-400: #687568;
+  --green-300: #49554C;
+  --green-200: #3d4945;
+  --green-100: #e8ece9;
 
   /* ── Oranges (cost blocks) ── */
-  --orange-900: #2a1a08;
-  --orange-800: #3d2610;
-  --orange-700: #5c3a16;
-  --orange-600: #7a4e1d;
-  --orange-500: #c47a2a;
-  --orange-400: #e09540;
-  --orange-300: #f0b060;
+  --orange-900: #fef6ee;
+  --orange-800: #f5dcc0;
+  --orange-700: #d4913a;
+  --orange-600: #b87520;
+  --orange-500: #9a6218;
+  --orange-400: #c47a2a;
+  --orange-300: #8a5a15;
   --orange-200: #f5cc8a;
   --orange-100: #fae8c8;
 
   /* ── Purples (hours/labor) ── */
-  --purple-900: #1a1025;
-  --purple-800: #261838;
-  --purple-700: #3a2456;
-  --purple-600: #4e3272;
+  --purple-900: #f3eef8;
+  --purple-800: #ddd0ed;
+  --purple-700: #7050a0;
+  --purple-600: #5a3d88;
   --purple-500: #7050a0;
   --purple-400: #8e6ec0;
-  --purple-300: #ad90d8;
+  --purple-300: #5a3d88;
   --purple-200: #cbb8e8;
   --purple-100: #e8ddf5;
 
-  /* ── Neutrals ── */
-  --neutral-950: #0c0e0d;
-  --neutral-900: #131716;
-  --neutral-850: #181d1b;
-  --neutral-800: #1e2422;
-  --neutral-750: #242b28;
-  --neutral-700: #2c3532;
-  --neutral-600: #3d4845;
-  --neutral-500: #5a6662;
-  --neutral-400: #7a8682;
-  --neutral-300: #9ca6a2;
-  --neutral-200: #c0c8c5;
-  --neutral-100: #e2e6e4;
-  --neutral-50:  #f4f5f5;
+  /* ── Neutrals (light mode) ── */
+  --neutral-950: #e8e0d4;
+  --neutral-900: #ece5da;
+  --neutral-850: #f0eae0;
+  --neutral-800: #f4efe6;
+  --neutral-750: #f8f4ed;
+  --neutral-700: #d6cfc5;
+  --neutral-600: #c2bab0;
+  --neutral-500: #9a9490;
+  --neutral-400: #706b66;
+  --neutral-300: #504c48;
+  --neutral-200: #3a3835;
+  --neutral-100: #2a2826;
+  --neutral-50:  #1a1918;
+
+  /* ── Neumorphic shadows ── */
+  --shadow-raised: 4px 4px 8px rgba(0,0,0,0.08), -4px -4px 8px rgba(255,255,255,0.7);
+  --shadow-inset: inset 2px 2px 4px rgba(0,0,0,0.06), inset -2px -2px 4px rgba(255,255,255,0.5);
+  --shadow-pressed: inset 1px 1px 3px rgba(0,0,0,0.08), inset -1px -1px 3px rgba(255,255,255,0.4);
 
   /* ── Semantic ── */
   --bg-primary: var(--neutral-950);
   --bg-surface: var(--neutral-900);
   --bg-elevated: var(--neutral-850);
   --bg-card: var(--neutral-800);
-  --bg-input: var(--neutral-750);
+  --bg-input: #fff;
   --border: var(--neutral-700);
   --border-subtle: var(--neutral-800);
   --text-primary: var(--neutral-100);
   --text-secondary: var(--neutral-400);
   --text-muted: var(--neutral-500);
-  --accent: var(--green-400);
-  --accent-dim: var(--green-700);
-  --accent-text: var(--green-300);
+  --accent: var(--green-600);
+  --accent-dim: var(--green-100);
+  --accent-text: var(--green-600);
   --cost-accent: var(--orange-500);
   --cost-bg: var(--orange-900);
   --cost-border: var(--orange-800);
@@ -77,8 +82,8 @@
 
   /* ── Status ── */
   --status-draft: var(--neutral-500);
-  --status-quoted: var(--green-400);
-  --status-won: var(--green-300);
+  --status-quoted: var(--green-600);
+  --status-won: var(--green-600);
   --status-lost: #c45a5a;
 
   /* ── Typography ── */
@@ -106,7 +111,7 @@ body {
 }
 
 a { color: var(--accent-text); text-decoration: none; }
-a:hover { color: var(--green-200); }
+a:hover { color: var(--green-700); }
 
 /* ── Layout ── */
 .app-layout {
@@ -291,7 +296,8 @@ a:hover { color: var(--green-200); }
 
 .btn-primary {
   background: var(--green-600);
-  color: var(--green-100);
+  color: #fff;
+  box-shadow: var(--shadow-raised);
 }
 .btn-primary:hover { background: var(--green-500); }
 
@@ -328,9 +334,9 @@ a:hover { color: var(--green-200); }
 .btn-danger {
   background: transparent;
   color: #c45a5a;
-  border: 1px solid #3a2020;
+  border: 1px solid #e0a0a0;
 }
-.btn-danger:hover { background: #2a1515; }
+.btn-danger:hover { background: #fdf0f0; }
 
 /* ── Cards ── */
 .card {
@@ -338,6 +344,7 @@ a:hover { color: var(--green-200); }
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 20px;
+  box-shadow: var(--shadow-raised);
 }
 
 .card-header {
@@ -426,11 +433,11 @@ a:hover { color: var(--green-200); }
 .totals-value {
   font-family: var(--font-mono);
   font-size: 0.95rem;
-  color: var(--green-200);
+  color: var(--green-600);
 }
 
 .totals-value.final {
-  color: var(--green-300);
+  color: var(--green-600);
   font-weight: 700;
 }
 
@@ -484,7 +491,7 @@ a:hover { color: var(--green-200); }
 
 .add-product-column:hover {
   border-color: var(--green-600);
-  color: var(--green-200);
+  color: var(--green-600);
 }
 
 /* ── Product Cards ── */
@@ -558,7 +565,7 @@ a:hover { color: var(--green-200); }
 
 .summary-stat .value.cost-val { color: var(--cost-text); }
 .summary-stat .value.hours-val { color: var(--hours-text); }
-.summary-stat .value.price-val { color: var(--green-300); }
+.summary-stat .value.price-val { color: var(--green-600); }
 
 .product-card-body {
   padding: 0 20px 20px;
@@ -607,6 +614,7 @@ a:hover { color: var(--green-200); }
   font-size: 0.875rem;
   color: var(--text-primary);
   transition: border-color 0.15s;
+  box-shadow: var(--shadow-inset);
 }
 
 .field input:focus, .field select:focus {
@@ -664,11 +672,11 @@ a:hover { color: var(--green-200); }
   gap: 10px;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
 }
 
 .block-row-header {
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
   padding-bottom: 6px;
   margin-bottom: 4px;
 }
@@ -699,8 +707,8 @@ a:hover { color: var(--green-200); }
 .block-row:last-child { border-bottom: none; }
 
 .block-row input, .block-row select {
-  background: rgba(0,0,0,0.2);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.03);
+  border: 1px solid rgba(0,0,0,0.06);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-family: var(--font-body);
@@ -710,7 +718,7 @@ a:hover { color: var(--green-200); }
 
 .block-row input:focus, .block-row select:focus {
   outline: none;
-  border-color: rgba(255,255,255,0.2);
+  border-color: rgba(0,0,0,0.12);
 }
 
 .block-computed {
@@ -731,7 +739,7 @@ a:hover { color: var(--green-200); }
   align-items: center;
   justify-content: center;
 }
-.block-delete:hover { color: #c45a5a; background: rgba(196,90,90,0.1); }
+.block-delete:hover { color: #c45a5a; background: rgba(196,90,90,0.08); }
 
 /* ── Pricing Summary ── */
 .pricing-summary {
@@ -764,7 +772,7 @@ a:hover { color: var(--green-200); }
 }
 
 .pricing-item .value.final {
-  color: var(--green-300);
+  color: var(--green-600);
   font-size: 1.2rem;
 }
 
@@ -782,6 +790,7 @@ a:hover { color: var(--green-200); }
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.15s;
+  box-shadow: var(--shadow-raised);
 }
 .quote-row:hover {
   border-color: var(--neutral-600);
@@ -810,16 +819,16 @@ a:hover { color: var(--green-200); }
   letter-spacing: 0.04em;
 }
 
-.status-badge.draft { background: rgba(90,102,98,0.2); color: var(--status-draft); }
-.status-badge.quoted { background: rgba(61,140,84,0.15); color: var(--status-quoted); }
-.status-badge.won { background: rgba(90,173,111,0.15); color: var(--status-won); }
-.status-badge.lost { background: rgba(196,90,90,0.15); color: var(--status-lost); }
+.status-badge.draft { background: rgba(154,148,144,0.15); color: var(--status-draft); }
+.status-badge.quoted { background: rgba(73,85,76,0.12); color: var(--status-quoted); }
+.status-badge.won { background: rgba(73,85,76,0.15); color: var(--status-won); }
+.status-badge.lost { background: rgba(196,90,90,0.12); color: var(--status-lost); }
 
 .quote-row .price {
   font-family: var(--font-mono);
   font-weight: 600;
   text-align: right;
-  color: var(--green-300);
+  color: var(--green-600);
 }
 
 .quote-row .date {
@@ -864,13 +873,13 @@ a:hover { color: var(--green-200); }
 }
 
 .notice-error {
-  border-color: #563030;
-  background: #241616;
+  border-color: #e0a0a0;
+  background: #fdf0f0;
 }
 
 .notice-warning {
   border-color: var(--orange-800);
-  background: rgba(61, 38, 16, 0.65);
+  background: #fef8f0;
 }
 
 .compact-notice {
@@ -988,7 +997,7 @@ a:hover { color: var(--green-200); }
 }
 
 .sp-icon-btn:hover { color: var(--text-secondary); }
-.sp-icon-btn--danger:hover { color: #c45a5a; background: rgba(196,90,90,0.1); }
+.sp-icon-btn--danger:hover { color: #c45a5a; background: rgba(196,90,90,0.08); }
 
 .sp-pool-card {
   border: 1px solid var(--border);
@@ -1334,7 +1343,7 @@ a:hover { color: var(--green-200); }
 
 .canvas-product-delete:hover {
   color: #c45a5a;
-  background: rgba(196,90,90,0.1);
+  background: rgba(196,90,90,0.08);
 }
 
 .canvas-product-meta {
@@ -1386,7 +1395,7 @@ a:hover { color: var(--green-200); }
 
 .canvas-add-product-btn:hover {
   border-color: var(--green-600);
-  color: var(--green-200);
+  color: var(--green-600);
   background: var(--accent-dim);
 }
 
@@ -1512,7 +1521,7 @@ a:hover { color: var(--green-200); }
 
 .canvas-block-delete:hover {
   color: #c45a5a;
-  background: rgba(196,90,90,0.1);
+  background: rgba(196,90,90,0.08);
 }
 
 /* ── Block Member Cells ── */
@@ -1532,7 +1541,7 @@ a:hover { color: var(--green-200); }
 }
 
 .canvas-computed:hover {
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.04);
 }
 
 .canvas-computed--cost { color: var(--cost-text); }
@@ -1567,11 +1576,11 @@ a:hover { color: var(--green-200); }
 }
 
 .canvas-cell--cost-value {
-  background: rgba(42, 26, 8, 0.2);
+  background: rgba(154, 98, 24, 0.04);
 }
 
 .canvas-cell--labor-value {
-  background: rgba(26, 16, 37, 0.2);
+  background: rgba(90, 61, 136, 0.04);
 }
 
 /* ── Editable Unit Cells ── */
@@ -1708,9 +1717,9 @@ a:hover { color: var(--green-200); }
 
 .canvas-pricing-value--cost { color: var(--cost-text); }
 .canvas-pricing-value--hours { color: var(--hours-text); }
-.canvas-pricing-value--price { color: var(--green-300); }
+.canvas-pricing-value--price { color: var(--green-600); }
 .canvas-pricing-value--final {
-  color: var(--green-200);
+  color: var(--green-600);
   font-weight: 700;
   font-size: 0.9rem;
 }
@@ -2070,7 +2079,7 @@ a:hover { color: var(--green-200); }
   font-family: var(--font-mono);
   font-size: 1.2rem;
   font-weight: 700;
-  color: var(--green-300);
+  color: var(--green-600);
 }
 
 .qb-total-hours {
@@ -2141,7 +2150,7 @@ a:hover { color: var(--green-200); }
 
 .sp-block-delete-btn:hover {
   color: #c45a5a;
-  background: rgba(196,90,90,0.1);
+  background: rgba(196,90,90,0.08);
 }
 
 /* ── Material Search Autocomplete ── */
