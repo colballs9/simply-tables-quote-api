@@ -136,6 +136,7 @@ def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
                 "description": m.description,
                 "hours_per_unit": m.hours_per_unit,
                 "cost_per_unit": m.cost_per_unit,
+                "units_per_product": m.units_per_product,
                 "is_active": m.is_active,
             })
 

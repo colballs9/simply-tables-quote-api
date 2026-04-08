@@ -18,10 +18,9 @@ const METRIC_SOURCES = [
 const DIST_OPTIONS = [
   { value: 'units', label: 'By Units' },
   { value: 'sqft', label: 'By Sq Ft' },
-  { value: 'bdft', label: 'By Bd Ft' },
 ]
 
-export default function BlockRowLabor({ block, onBlockUpdate }) {
+export default function BlockRowLabor({ block, onBlockUpdate, availableTags }) {
   const [label, setLabel] = useState(block.label || '')
   const [hoursPerUnit, setHoursPerUnit] = useState(String(block.hours_per_unit ?? ''))
   const [rateValue, setRateValue] = useState(String(block.rate_value ?? ''))
@@ -178,6 +177,17 @@ export default function BlockRowLabor({ block, onBlockUpdate }) {
             title="Hours per unit"
           />
         )}
+
+        <select
+          className="canvas-block-select canvas-block-tag-select"
+          value={block.tag_id || ''}
+          onChange={e => onBlockUpdate({ tag_id: e.target.value || null })}
+        >
+          <option value="">No Tag</option>
+          {(availableTags || []).map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
       </div>
     </div>
   )

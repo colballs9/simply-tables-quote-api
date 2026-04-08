@@ -313,13 +313,13 @@ def compute_cost_block(block: dict, member: dict, product: dict) -> dict:
 
     Uses member-level cost_per_unit override if present, otherwise block-level.
 
-    multiplier_type determines what units_per_product resolves to:
-        'per_unit'  → units_per_product (flat cost per table; canonical name)
-        'per_piece' → units_per_product (same math; UI labels it "pieces per table")
-        'fixed'     → units_per_product (legacy alias, kept for backward compat)
-        'per_base'  → bases_per_top
-        'per_sqft'  → sq_ft (DIA-adjusted area for material cost)
-        'per_bdft'  → bd_ft
+    multiplier_type determines the cost formula:
+        'per_unit'  → cost_pp = cost_per_unit (flat cost per table)
+        'fixed'     → same as per_unit (legacy alias)
+        'per_piece' → cost_pp = cost_per_unit × units_per_product (member-level pieces)
+        'per_base'  → cost_pp = cost_per_unit × bases_per_top
+        'per_sqft'  → cost_pp = cost_per_unit × sq_ft (built-in stone pipeline)
+        'per_bdft'  → cost_pp = cost_per_unit × bd_ft (built-in species pipeline)
 
     Sheet pattern (Unit Block):
         PP = CostPU × Multiplier
@@ -337,10 +337,14 @@ def compute_cost_block(block: dict, member: dict, product: dict) -> dict:
         multiplier = _d(product.get("sq_ft", 0))
     elif multiplier_type == "per_bdft":
         multiplier = _d(product.get("bd_ft", 0))
-    elif multiplier_type in ("per_unit", "per_piece", "fixed"):
-        multiplier = _d(block.get("units_per_product", 1))
+    elif multiplier_type == "per_piece":
+        # Pieces mode: use member-level units_per_product (pieces per table)
+        multiplier = _d(member.get("units_per_product") if member.get("units_per_product") is not None else block.get("units_per_product", 1))
+    elif multiplier_type in ("per_unit", "fixed"):
+        # Units mode: flat cost per table, no multiplier
+        multiplier = Decimal("1")
     else:
-        multiplier = _d(block.get("units_per_product", 1))
+        multiplier = Decimal("1")
 
     cost_pp = _round4(cost_per_unit * multiplier)
     cost_pt = _round4(cost_pp * quantity)

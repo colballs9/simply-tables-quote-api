@@ -81,6 +81,13 @@ export const defaults = {
   update: (data) => request('/defaults', { method: 'PATCH', body: data }),
 };
 
+// ── Tags ──
+
+export const tags = {
+  list: () => request('/tags'),
+  create: (data) => request('/tags', { method: 'POST', body: data }),
+};
+
 // ── Catalog & Context ──
 
 export const catalog = {

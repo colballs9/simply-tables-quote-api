@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
-import { products, quoteBlocks } from '../api/client'
+import { products, quoteBlocks, tags as tagsApi } from '../api/client'
 import ProductHeaderRow from './ProductHeaderRow'
 import BlockRow from './BlockRow'
 import RatesRow from './RatesRow'
@@ -47,7 +47,13 @@ const COST_SECTION_DEFAULTS = {
 
 export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const [error, setError] = useState(null)
+  const [availableTags, setAvailableTags] = useState([])
   const productList = activeOption?.products || []
+
+  // Fetch tags once on mount
+  useEffect(() => {
+    tagsApi.list().then(setAvailableTags).catch(err => console.error('Failed to load tags:', err))
+  }, [])
 
   const sortedProducts = useMemo(() => stableSort(productList), [productList])
 
@@ -186,6 +192,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                   products={sortedProducts}
                   quoteId={quote.id}
                   onQuoteUpdate={onQuoteUpdate}
+                  availableTags={availableTags}
                 />
               ))}
             </div>
@@ -225,6 +232,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                   products={sortedProducts}
                   quoteId={quote.id}
                   onQuoteUpdate={onQuoteUpdate}
+                  availableTags={availableTags}
                 />
               ))}
             </div>

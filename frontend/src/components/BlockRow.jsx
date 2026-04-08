@@ -15,7 +15,7 @@ function formatHours(val) {
   return Number(val).toFixed(2) + 'h'
 }
 
-export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
+export default function BlockRow({ block, products, quoteId, onQuoteUpdate, availableTags }) {
   const isCost = block.block_domain === 'cost'
   const isUnit = block.block_type === 'unit'
   const [toggling, setToggling] = useState(null) // product_id being toggled
@@ -64,9 +64,9 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
       <div className={`canvas-cell canvas-cell--label canvas-cell--block ${isCost ? 'canvas-cell--cost' : 'canvas-cell--labor'}`}>
         <div className="canvas-block-label-content">
           {isCost ? (
-            <BlockRowCost block={block} onBlockUpdate={handleBlockUpdate} />
+            <BlockRowCost block={block} onBlockUpdate={handleBlockUpdate} availableTags={availableTags} />
           ) : (
-            <BlockRowLabor block={block} onBlockUpdate={handleBlockUpdate} />
+            <BlockRowLabor block={block} onBlockUpdate={handleBlockUpdate} availableTags={availableTags} />
           )}
           {!block.is_builtin && (
             <button className="canvas-block-delete" onClick={handleDeleteBlock} title="Delete block">
@@ -140,19 +140,31 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
 
 
 function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
+  const isPieces = isCost && block.multiplier_type === 'per_piece'
+
   const effectiveValue = isCost
     ? (member.cost_per_unit ?? block.cost_per_unit ?? '')
     : (member.hours_per_unit ?? block.hours_per_unit ?? '')
 
+  const effectivePieces = member.units_per_product ?? block.units_per_product ?? 1
+
   const [localVal, setLocalVal] = useState(String(effectiveValue))
+  const [localPieces, setLocalPieces] = useState(String(effectivePieces))
   const focusRef = useRef(null)
   const ss = useSpreadsheetInput(setLocalVal)
+  const ssPieces = useSpreadsheetInput(setLocalPieces)
 
   const prevValRef = useRef(effectiveValue)
-  if (effectiveValue !== prevValRef.current && !focusRef.current) {
+  if (effectiveValue !== prevValRef.current && focusRef.current !== 'value') {
     setLocalVal(String(effectiveValue ?? ''))
   }
   prevValRef.current = effectiveValue
+
+  const prevPiecesRef = useRef(effectivePieces)
+  if (effectivePieces !== prevPiecesRef.current && focusRef.current !== 'pieces') {
+    setLocalPieces(String(effectivePieces ?? 1))
+  }
+  prevPiecesRef.current = effectivePieces
 
   async function saveValue() {
     focusRef.current = null
@@ -168,22 +180,51 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
     }
   }
 
+  async function savePieces() {
+    focusRef.current = null
+    const val = parseFloat(localPieces)
+    if (isNaN(val)) return
+    if (val === effectivePieces) return
+    try {
+      const updated = await quoteBlocks.updateMember(block.id, product.id, { units_per_product: val })
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to update member pieces:', err)
+    }
+  }
+
   const computedPP = isCost ? member.cost_pp : member.hours_pp
   const computedPT = computedPP != null && product.quantity ? computedPP * product.quantity : null
 
   return (
     <div className="canvas-unit-cell">
-      <input
-        className={`canvas-unit-input ${isCost ? 'canvas-unit-input--cost' : 'canvas-unit-input--hours'}`}
-        type="number"
-        step={isCost ? '0.01' : '0.01'}
-        value={localVal}
-        onChange={e => setLocalVal(e.target.value)}
-        onFocus={e => { focusRef.current = true; ss.onFocus(e) }}
-        onBlur={saveValue}
-        onKeyDown={ss.onKeyDown}
-        title={isCost ? 'Cost per unit' : 'Hours per unit'}
-      />
+      <div className="canvas-unit-inputs">
+        <input
+          className={`canvas-unit-input ${isCost ? 'canvas-unit-input--cost' : 'canvas-unit-input--hours'}`}
+          type="number"
+          step={isCost ? '0.01' : '0.01'}
+          value={localVal}
+          onChange={e => setLocalVal(e.target.value)}
+          onFocus={e => { focusRef.current = 'value'; ss.onFocus(e) }}
+          onBlur={saveValue}
+          onKeyDown={ss.onKeyDown}
+          title={isCost ? (isPieces ? 'Cost per piece' : 'Cost per unit') : 'Hours per unit'}
+        />
+        {isPieces && (
+          <input
+            className="canvas-unit-input canvas-unit-input--pieces"
+            type="number"
+            step="1"
+            value={localPieces}
+            onChange={e => setLocalPieces(e.target.value)}
+            onFocus={e => { focusRef.current = 'pieces'; ssPieces.onFocus(e) }}
+            onBlur={savePieces}
+            onKeyDown={ssPieces.onKeyDown}
+            title="Pieces per unit"
+            placeholder="pcs"
+          />
+        )}
+      </div>
       <span className={`canvas-unit-pp ${isCost ? 'canvas-unit-pp--cost' : 'canvas-unit-pp--hours'}`}>
         {isCost ? formatCost(computedPP) : formatHours(computedPP)}
         <span className="canvas-unit-pp-label"> pp</span>

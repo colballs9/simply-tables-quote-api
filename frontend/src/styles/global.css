@@ -1604,6 +1604,22 @@ a:hover { color: var(--green-200); }
 .canvas-unit-input--cost { color: var(--cost-text); }
 .canvas-unit-input--hours { color: var(--hours-text); }
 
+.canvas-unit-inputs {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+}
+
+.canvas-unit-input--pieces {
+  width: 50px;
+  color: var(--text-secondary);
+}
+
+.canvas-block-tag-select {
+  max-width: 80px;
+  font-size: 0.65rem;
+}
+
 .canvas-unit-pp {
   font-family: var(--font-mono);
   font-size: 0.7rem;

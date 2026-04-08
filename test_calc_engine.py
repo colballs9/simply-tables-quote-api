@@ -334,14 +334,33 @@ class TestComputeComponent:
 class TestCostBlock:
 
     def test_fixed_multiplier(self):
-        """Simple unit cost: $25 × 3 units = $75 PP"""
+        """Fixed/per_unit: flat cost per table, no multiplier. $25 PP."""
         result = compute_cost_block(
-            {"cost_per_unit": 25, "multiplier_type": "fixed", "units_per_product": 3},
+            {"cost_per_unit": 25, "multiplier_type": "fixed"},
             {},
+            {"quantity": 2},
+        )
+        assert result["cost_pp"] == Decimal("25.0000")
+        assert result["cost_pt"] == Decimal("50.0000")
+
+    def test_per_piece_multiplier(self):
+        """Pieces: $25/piece × 3 pieces = $75 PP"""
+        result = compute_cost_block(
+            {"cost_per_unit": 25, "multiplier_type": "per_piece", "units_per_product": 3},
+            {"units_per_product": 3},
             {"quantity": 2},
         )
         assert result["cost_pp"] == Decimal("75.0000")
         assert result["cost_pt"] == Decimal("150.0000")
+
+    def test_per_piece_member_override(self):
+        """Pieces: member-level units_per_product overrides block-level."""
+        result = compute_cost_block(
+            {"cost_per_unit": 10, "multiplier_type": "per_piece", "units_per_product": 2},
+            {"units_per_product": 5},
+            {"quantity": 1},
+        )
+        assert result["cost_pp"] == Decimal("50.0000")
 
     def test_per_base_multiplier(self):
         """Stock base: $255 × 2 bases_per_top = $510 PP"""

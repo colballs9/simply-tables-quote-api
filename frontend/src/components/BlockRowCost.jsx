@@ -4,29 +4,23 @@ import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 const BLOCK_TYPES = [
   { value: 'unit', label: 'Unit Cost' },
   { value: 'group', label: 'Group Cost' },
-  { value: 'rate', label: 'Rate Cost' },
 ]
 
 const MULTIPLIER_TYPES = [
-  { value: 'fixed', label: 'Fixed' },
+  { value: 'per_unit', label: 'Units' },
   { value: 'per_piece', label: 'Pieces' },
   { value: 'per_base', label: 'Per Base' },
-  { value: 'per_sqft', label: 'Per Sq Ft' },
-  { value: 'per_bdft', label: 'Per Bd Ft' },
 ]
 
 const DIST_OPTIONS = [
   { value: 'units', label: 'By Units' },
   { value: 'sqft', label: 'By Sq Ft' },
-  { value: 'bdft', label: 'By Bd Ft' },
 ]
 
-export default function BlockRowCost({ block, onBlockUpdate }) {
+export default function BlockRowCost({ block, onBlockUpdate, availableTags }) {
   // Local draft state — only overwritten from props when NOT focused
   const [label, setLabel] = useState(block.label || '')
-  const [costPerUnit, setCostPerUnit] = useState(String(block.cost_per_unit ?? ''))
   const [totalAmount, setTotalAmount] = useState(String(block.total_amount ?? ''))
-  const [unitsPerProduct, setUnitsPerProduct] = useState(String(block.units_per_product ?? 1))
 
   // Track which field is focused to avoid clobbering during edits
   const focusRef = useRef(null)
@@ -36,46 +30,28 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
   if (block.id !== prevBlockIdRef.current) {
     prevBlockIdRef.current = block.id
     setLabel(block.label || '')
-    setCostPerUnit(String(block.cost_per_unit ?? ''))
     setTotalAmount(String(block.total_amount ?? ''))
-    setUnitsPerProduct(String(block.units_per_product ?? 1))
   }
 
   // Sync individual fields from props only when NOT focused
-  const prevPropsRef = useRef({ label: block.label, cpu: block.cost_per_unit, ta: block.total_amount, upp: block.units_per_product })
+  const prevPropsRef = useRef({ label: block.label, ta: block.total_amount })
   if (block.label !== prevPropsRef.current.label && focusRef.current !== 'label') {
     setLabel(block.label || '')
-  }
-  if (block.cost_per_unit !== prevPropsRef.current.cpu && focusRef.current !== 'costPerUnit') {
-    setCostPerUnit(String(block.cost_per_unit ?? ''))
   }
   if (block.total_amount !== prevPropsRef.current.ta && focusRef.current !== 'totalAmount') {
     setTotalAmount(String(block.total_amount ?? ''))
   }
-  if (block.units_per_product !== prevPropsRef.current.upp && focusRef.current !== 'unitsPerProduct') {
-    setUnitsPerProduct(String(block.units_per_product ?? 1))
-  }
-  prevPropsRef.current = { label: block.label, cpu: block.cost_per_unit, ta: block.total_amount, upp: block.units_per_product }
+  prevPropsRef.current = { label: block.label, ta: block.total_amount }
 
   const isGroup = block.block_type === 'group'
 
   const ssLabel = useSpreadsheetInput(setLabel)
-  const ssCostPerUnit = useSpreadsheetInput(setCostPerUnit)
   const ssTotalAmount = useSpreadsheetInput(setTotalAmount)
-  const ssUnitsPerProduct = useSpreadsheetInput(setUnitsPerProduct)
 
   function saveLabel() {
     focusRef.current = null
     if (label !== (block.label || '')) {
       onBlockUpdate({ label })
-    }
-  }
-
-  function saveCostPerUnit() {
-    focusRef.current = null
-    const val = parseFloat(costPerUnit)
-    if (!isNaN(val) && val !== block.cost_per_unit) {
-      onBlockUpdate({ cost_per_unit: val })
     }
   }
 
@@ -86,16 +62,6 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
       onBlockUpdate({ total_amount: val })
     }
   }
-
-  function saveUnitsPerProduct() {
-    focusRef.current = null
-    const val = parseFloat(unitsPerProduct)
-    if (!isNaN(val) && val !== block.units_per_product) {
-      onBlockUpdate({ units_per_product: val })
-    }
-  }
-
-  const showUnitsPP = !isGroup && (block.multiplier_type === 'fixed' || block.multiplier_type === 'per_piece')
 
   return (
     <div className="canvas-block-fields">
@@ -144,45 +110,27 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
             </select>
           </>
         ) : (
-          <>
-            <select
-              className="canvas-block-select"
-              value={block.multiplier_type || 'fixed'}
-              onChange={e => onBlockUpdate({ multiplier_type: e.target.value })}
-            >
-              {MULTIPLIER_TYPES.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-            <input
-              className="canvas-block-num-input"
-              type="number"
-              step="0.01"
-              value={costPerUnit}
-              onChange={e => setCostPerUnit(e.target.value)}
-              onFocus={e => { focusRef.current = 'costPerUnit'; ssCostPerUnit.onFocus(e) }}
-              onBlur={saveCostPerUnit}
-              onKeyDown={ssCostPerUnit.onKeyDown}
-              placeholder="$/unit"
-              title="Cost per unit"
-            />
-            {showUnitsPP && (
-              <input
-                className="canvas-block-num-input"
-                type="number"
-                step="1"
-                value={unitsPerProduct}
-                onChange={e => setUnitsPerProduct(e.target.value)}
-                onFocus={e => { focusRef.current = 'unitsPerProduct'; ssUnitsPerProduct.onFocus(e) }}
-                onBlur={saveUnitsPerProduct}
-                onKeyDown={ssUnitsPerProduct.onKeyDown}
-                placeholder="qty"
-                title="Units per product (pieces per table)"
-                style={{ width: 50 }}
-              />
-            )}
-          </>
+          <select
+            className="canvas-block-select"
+            value={block.multiplier_type || 'per_unit'}
+            onChange={e => onBlockUpdate({ multiplier_type: e.target.value })}
+          >
+            {MULTIPLIER_TYPES.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
         )}
+
+        <select
+          className="canvas-block-select canvas-block-tag-select"
+          value={block.tag_id || ''}
+          onChange={e => onBlockUpdate({ tag_id: e.target.value || null })}
+        >
+          <option value="">No Tag</option>
+          {(availableTags || []).map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
       </div>
     </div>
   )
