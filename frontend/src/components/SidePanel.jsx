@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { quotes as quotesApi } from '../api/client'
 
@@ -43,6 +43,132 @@ function SummaryRow({ label, value, indent = false, accent, muted }) {
       >
         {value}
       </span>
+    </div>
+  )
+}
+
+// ── Quote Stats ─────────────────────────────────────────────────────
+
+function QuoteStats({ activeOption }) {
+  const prods = activeOption?.products || []
+
+  const stats = useMemo(() => {
+    const totalProducts = prods.length
+    const totalQuantity = prods.reduce((sum, p) => sum + (p.quantity || 0), 0)
+    const totalSqFt = prods.reduce((sum, p) => sum + (p.sq_ft || 0), 0)
+
+    const materialCounts = {}
+    prods.forEach(p => {
+      const mt = p.material_type || 'Unknown'
+      materialCounts[mt] = (materialCounts[mt] || 0) + 1
+    })
+    const materials = Object.entries(materialCounts)
+      .sort(([, a], [, b]) => b - a)
+      .map(([type, count]) => `${type} (${count})`)
+
+    return { totalProducts, totalQuantity, totalSqFt, materials }
+  }, [prods])
+
+  return (
+    <div className="canvas-panel">
+      <div className="canvas-panel-title">Quote Stats</div>
+      <SummaryRow label="Products" value={stats.totalProducts} />
+      <SummaryRow label="Total Qty" value={stats.totalQuantity} />
+      <SummaryRow label="Total Sq Ft" value={stats.totalSqFt > 0 ? stats.totalSqFt.toFixed(1) : '\u2014'} />
+      {stats.materials.length > 0 && (
+        <>
+          <div className="sp-divider" />
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+            Materials
+          </div>
+          {stats.materials.map(m => (
+            <div key={m} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '1px 0' }}>{m}</div>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Block Configs ───────────────────────────────────────────────────
+
+function BlockConfigs({ quote }) {
+  const [expanded, setExpanded] = useState(false)
+  const allBlocks = quote?.quote_blocks || []
+  const costBlocks = allBlocks.filter(b => b.block_domain === 'cost')
+  const laborBlocks = allBlocks.filter(b => b.block_domain === 'labor')
+
+  if (allBlocks.length === 0) return null
+
+  return (
+    <div className="canvas-panel">
+      <div
+        className="sp-expandable-header"
+        onClick={() => setExpanded(v => !v)}
+        style={{ marginBottom: expanded ? 8 : 0 }}
+      >
+        <span className="canvas-panel-title" style={{ marginBottom: 0 }}>
+          Block Configs ({allBlocks.length})
+        </span>
+        {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+      </div>
+
+      {expanded && (
+        <>
+          {costBlocks.length > 0 && (
+            <>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--cost-text)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '4px 0' }}>
+                Cost Blocks
+              </div>
+              {costBlocks.map(b => (
+                <BlockConfigCard key={b.id} block={b} domain="cost" />
+              ))}
+            </>
+          )}
+          {laborBlocks.length > 0 && (
+            <>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--hours-text)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '6px 0 4px' }}>
+                Labor Blocks
+              </div>
+              {laborBlocks.map(b => (
+                <BlockConfigCard key={b.id} block={b} domain="labor" />
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function BlockConfigCard({ block, domain }) {
+  const isCost = domain === 'cost'
+  const badgeClass = isCost ? 'cost' : 'hours'
+  const fields = []
+
+  if (block.block_type) fields.push({ k: 'Type', v: block.block_type })
+  if (isCost && block.cost_category) fields.push({ k: 'Category', v: block.cost_category })
+  if (isCost && block.multiplier_type) fields.push({ k: 'Multiplier', v: block.multiplier_type })
+  if (!isCost && block.labor_center) fields.push({ k: 'Center', v: `${block.labor_center} ${LC_LABELS[block.labor_center] || ''}` })
+  if (block.rate_type) fields.push({ k: 'Rate Type', v: block.rate_type })
+
+  return (
+    <div className="sp-block-config-card">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+        <span className={`pool-tag ${badgeClass}`} style={{ fontSize: '0.58rem', padding: '0px 5px' }}>
+          {block.block_type}
+        </span>
+        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          {block.label || 'Untitled'}
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px' }}>
+        {fields.map(f => (
+          <span key={f.k} style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            {f.k}: <span style={{ color: 'var(--text-secondary)' }}>{f.v}</span>
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -96,6 +222,12 @@ export default function SidePanel({ quote, activeOption, onOptionSelect, onQuote
           </div>
         </div>
       )}
+
+      {/* ── Quote Stats ── */}
+      <QuoteStats activeOption={activeOption} />
+
+      {/* ── Block Configs ── */}
+      <BlockConfigs quote={quote} />
 
       {/* ── Job Summary ── */}
       <div className="canvas-panel">

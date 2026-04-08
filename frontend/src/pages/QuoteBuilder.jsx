@@ -169,118 +169,59 @@ export default function QuoteBuilder() {
 
   return (
     <div className="fade-in">
-      {/* Header */}
-      <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button className="btn btn-ghost" onClick={() => navigate('/')}>
+      {/* Consolidated Header Bar */}
+      <div className="qb-header-bar">
+        <div className="qb-header-left">
+          <button className="btn btn-ghost" onClick={() => navigate('/')} style={{ padding: '6px 8px' }}>
             <ArrowLeft size={16} />
           </button>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  font: 'inherit',
-                  fontSize: '1.6rem',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  letterSpacing: '-0.03em',
-                  padding: '2px 0',
-                  borderBottom: '2px solid transparent',
-                  width: '400px',
-                }}
-                value={localProjectName}
-                onChange={e => handleProjectNameChange(e.target.value)}
-                onBlur={handleProjectNameBlur}
-                onFocus={e => e.target.style.borderBottomColor = 'var(--accent)'}
-                placeholder="Project name..."
-              />
-              <span className={`status-badge ${quote.status}`}>{quote.status}</span>
-            </div>
-            <p className="page-subtitle" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
-              {quote.quote_number}
-              {saving && <span style={{ marginLeft: 12, color: 'var(--text-muted)' }}>Saving...</span>}
-            </p>
-          </div>
-        </div>
-
-        {/* Quote-level total */}
-        <div className="quote-header-actions">
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Quote Total
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--green-300)' }}>
-              {formatPrice(quote.total_price)}
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--hours-text)' }}>
-              {quote.total_hours ? `${Number(quote.total_hours).toFixed(1)} hours` : ''}
-            </div>
-          </div>
-          <div className="page-actions">
-            <button className="btn btn-ghost" onClick={() => loadQuote(quote.id)} disabled={loading || saving || recalculating}>
-              Refresh
-            </button>
-            <button className="btn btn-secondary" onClick={handleRecalculate} disabled={saving || recalculating}>
-              <RefreshCw size={16} /> {recalculating ? 'Recalculating...' : 'Recalculate'}
-            </button>
-            <button className="btn btn-danger" onClick={handleDeleteQuote} disabled={deleting || saving}>
-              <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Quote'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <div className="notice notice-error" style={{ marginBottom: 20 }}>
-          <strong>Something needs attention.</strong>
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Quote settings bar */}
-      <div className="card" style={{ marginBottom: 24, padding: '14px 20px' }}>
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="field" style={{ minWidth: 120 }}>
-            <label>Deal ID</label>
+          <div className="qb-header-name-group">
             <input
-              value={localDealId}
-              onChange={e => setLocalDealId(e.target.value)}
-              onBlur={() => {
-                if (localDealId !== (quote.deal_id || '')) {
-                  handleQuoteFieldChange('deal_id', localDealId)
-                }
-              }}
-              placeholder="0670"
+              className="qb-project-name-input"
+              value={localProjectName}
+              onChange={e => handleProjectNameChange(e.target.value)}
+              onBlur={handleProjectNameBlur}
+              onFocus={e => e.target.style.borderBottomColor = 'var(--accent)'}
+              placeholder="Project name..."
             />
+            <span className="qb-quote-number">
+              {quote.quote_number}
+              {saving && <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>Saving...</span>}
+            </span>
           </div>
-          <div className="field" style={{ minWidth: 100 }}>
-            <label>Status</label>
-            <select
-              value={quote.status}
-              onChange={e => handleQuoteFieldChange('status', e.target.value)}
-            >
-              <option value="draft">Draft</option>
-              <option value="quoted">Quoted</option>
-              <option value="won">Won</option>
-              <option value="lost">Lost</option>
-            </select>
-          </div>
-          <div className="field" style={{ minWidth: 80 }}>
-            <label>Rep</label>
-            <select
-              value={quote.has_rep ? 'yes' : 'no'}
-              onChange={e => handleQuoteFieldChange('has_rep', e.target.value === 'yes')}
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-          {quote.has_rep && (
-            <div className="field" style={{ minWidth: 80 }}>
-              <label>Rep Rate</label>
+          <input
+            className="qb-deal-id-input"
+            value={localDealId}
+            onChange={e => setLocalDealId(e.target.value)}
+            onBlur={() => {
+              if (localDealId !== (quote.deal_id || '')) {
+                handleQuoteFieldChange('deal_id', localDealId)
+              }
+            }}
+            placeholder="Deal #"
+          />
+          <select
+            className="qb-status-select"
+            value={quote.status}
+            onChange={e => handleQuoteFieldChange('status', e.target.value)}
+          >
+            <option value="draft">Draft</option>
+            <option value="quoted">Quoted</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
+          </select>
+          <div className="qb-rep-group">
+            <label className="qb-rep-toggle">
               <input
+                type="checkbox"
+                checked={quote.has_rep}
+                onChange={e => handleQuoteFieldChange('has_rep', e.target.checked)}
+              />
+              <span>Rep</span>
+            </label>
+            {quote.has_rep && (
+              <input
+                className="qb-rep-rate-input"
                 type="number"
                 step="0.01"
                 value={localRepRate}
@@ -291,11 +232,34 @@ export default function QuoteBuilder() {
                     handleQuoteFieldChange('rep_rate', val)
                   }
                 }}
+                title="Rep rate"
               />
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+
+        <div className="qb-header-right">
+          <div className="qb-header-totals">
+            <span className="qb-total-price">{formatPrice(quote.total_price)}</span>
+            {quote.total_hours != null && (
+              <span className="qb-total-hours">{Number(quote.total_hours).toFixed(1)}h</span>
+            )}
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={handleRecalculate} disabled={saving || recalculating}>
+            <RefreshCw size={14} /> {recalculating ? 'Recalc...' : 'Recalc'}
+          </button>
+          <button className="btn btn-danger btn-sm" onClick={handleDeleteQuote} disabled={deleting || saving}>
+            <Trash2 size={13} />
+          </button>
         </div>
       </div>
+
+      {error && (
+        <div className="notice notice-error" style={{ marginBottom: 20 }}>
+          <strong>Something needs attention.</strong>
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="quote-canvas-shell">
         <SidePanel

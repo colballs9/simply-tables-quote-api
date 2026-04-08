@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { products, quoteBlocks } from '../api/client'
 import ProductHeaderRow from './ProductHeaderRow'
 import BlockRow from './BlockRow'
+import RatesRow from './RatesRow'
 import PricingRow from './PricingRow'
 
 // Stable sort: by sort_order first, then by id (string compare for UUIDs — stable across renders)
@@ -155,6 +156,9 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
             <Plus size={13} /> Add Labor Block
           </button>
         </div>
+
+        {/* Rates section (collapsible) */}
+        <RatesRow products={sortedProducts} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />
 
         {/* Pricing section header */}
         <div className="canvas-section-header canvas-section-header--pricing" style={{ gridColumn: '1 / -1' }}>

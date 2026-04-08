@@ -53,7 +53,6 @@ function buildLocals(p) {
 export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
   const [specsOpen, setSpecsOpen] = useState(true)
   const [descOpen, setDescOpen] = useState(false)
-  const [ratesOpen, setRatesOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [locals, setLocals] = useState(() => buildLocals(product))
@@ -110,14 +109,6 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
   function saveSelect(field, value) {
     setLocal(field, value)
     saveField(field, value)
-  }
-
-  function saveMargin(key) {
-    focusRef.current = null
-    const pctVal = parseFloat(locals[key])
-    if (isNaN(pctVal)) return
-    const rate = pctVal / 100
-    if (rate !== product[key]) saveField(key, rate)
   }
 
   async function handleDelete(e) {
@@ -205,34 +196,6 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
         </div>
       )}
 
-      {/* Rates section */}
-      <div className="pcol-section-header" onClick={() => setRatesOpen(v => !v)}>
-        <span>Rates</span>
-        {ratesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-      </div>
-      {ratesOpen && (
-        <div className="pcol-fields">
-          <PcolNum label="$/hr" field="hourly_rate" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('hourly_rate')} step="5" disabled={saving} />
-          <PcolNum label="Adjust" field="final_adjustment_rate" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveNum('final_adjustment_rate')} step="0.05" disabled={saving} />
-          <div className="pcol-margin-grid">
-            {MARGIN_FIELDS.map(f => (
-              <div key={f.key} className="pcol-margin-row">
-                <span className="pcol-margin-label">{f.label}</span>
-                <input
-                  className="pcol-margin-input"
-                  type="number" step="0.5"
-                  value={locals[f.key]}
-                  onChange={e => setLocal(f.key, e.target.value)}
-                  onFocus={() => { focusRef.current = f.key }}
-                  onBlur={() => saveMargin(f.key)}
-                  disabled={saving}
-                />
-                <span className="pcol-margin-pct">%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
