@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { products } from '../api/client'
 import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 import MaterialSearch from './MaterialSearch'
+import MaterialBuilder from './MaterialBuilder'
 
 const MATERIAL_TYPES = ['Hardwood', 'Stone', 'Live Edge', 'Laminate', 'Wood Edge Laminate', 'Outdoor', 'Other']
 const SHAPES = ['Standard', 'DIA', 'Custom Shape', 'Base Only']
@@ -211,6 +212,9 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
           <PcolText label="Notes" field="notes" locals={locals} setLocal={setLocal} focusRef={focusRef} onBlur={() => saveText('notes')} disabled={saving} />
         </div>
       )}
+
+      {/* Material Builder */}
+      <MaterialBuilder product={product} onQuoteUpdate={onQuoteUpdate} />
 
     </div>
   )

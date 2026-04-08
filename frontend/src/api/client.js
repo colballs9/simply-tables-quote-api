@@ -81,6 +81,14 @@ export const defaults = {
   update: (data) => request('/defaults', { method: 'PATCH', body: data }),
 };
 
+// ── Components (Material Builder) ──
+
+export const components = {
+  add: (productId, data) => request(`/products/${productId}/components`, { method: 'POST', body: data }),
+  update: (productId, componentId, data) => request(`/products/${productId}/components/${componentId}`, { method: 'PATCH', body: data }),
+  delete: (productId, componentId) => request(`/products/${productId}/components/${componentId}`, { method: 'DELETE' }),
+};
+
 // ── Tags ──
 
 export const tags = {
