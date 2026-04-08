@@ -186,7 +186,7 @@ function EditableProductCell({ product, field, optionId, onQuoteUpdate, step, fo
           onFocus={e => { focusRef.current = true; ss.onFocus(e) }}
           onBlur={saveValue}
           onKeyDown={ss.onKeyDown}
-          title={label}
+          title={field}
         />
         {isPercent && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>%</span>}
       </div>
