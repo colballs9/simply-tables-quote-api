@@ -169,15 +169,13 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                 style={{ gridColumn: '1 / -1' }}
               >
                 <span className="canvas-subsection-label">{section.label}</span>
-                {isEmpty && (
-                  <button
-                    className="canvas-subsection-add-btn canvas-subsection-add-btn--cost"
-                    onClick={() => handleAddCostBlock(section.key)}
-                    title={`Add ${section.label.toLowerCase()} block`}
-                  >
-                    <Plus size={12} />
-                  </button>
-                )}
+                <button
+                  className="canvas-subsection-add-btn canvas-subsection-add-btn--cost"
+                  onClick={() => handleAddCostBlock(section.key)}
+                  title={`Add ${section.label.toLowerCase()} block`}
+                >
+                  <Plus size={12} />
+                </button>
               </div>
 
               {/* Blocks in this section */}
@@ -190,15 +188,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                   onQuoteUpdate={onQuoteUpdate}
                 />
               ))}
-
-              {/* Add block button (shown when section has blocks) */}
-              {!isEmpty && (
-                <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
-                  <button className="canvas-add-btn canvas-add-btn--cost" onClick={() => handleAddCostBlock(section.key)}>
-                    <Plus size={13} /> Add Block
-                  </button>
-                </div>
-              )}
             </div>
           )
         })}
@@ -219,15 +208,13 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                 style={{ gridColumn: '1 / -1' }}
               >
                 <span className="canvas-subsection-label">{section.label}</span>
-                {isEmpty && (
-                  <button
-                    className="canvas-subsection-add-btn canvas-subsection-add-btn--labor"
-                    onClick={() => handleAddLaborBlock(section.lc)}
-                    title={`Add ${section.label} block`}
-                  >
-                    <Plus size={12} />
-                  </button>
-                )}
+                <button
+                  className="canvas-subsection-add-btn canvas-subsection-add-btn--labor"
+                  onClick={() => handleAddLaborBlock(section.lc)}
+                  title={`Add ${section.label} block`}
+                >
+                  <Plus size={12} />
+                </button>
               </div>
 
               {/* Blocks in this section */}
@@ -240,15 +227,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                   onQuoteUpdate={onQuoteUpdate}
                 />
               ))}
-
-              {/* Add block button (shown when section has blocks) */}
-              {!isEmpty && (
-                <div className="canvas-add-row" style={{ gridColumn: '1 / -1' }}>
-                  <button className="canvas-add-btn canvas-add-btn--labor" onClick={() => handleAddLaborBlock(section.lc)}>
-                    <Plus size={13} /> Add Block
-                  </button>
-                </div>
-              )}
             </div>
           )
         })}

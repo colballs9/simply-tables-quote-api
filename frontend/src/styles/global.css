@@ -1224,8 +1224,8 @@ a:hover { color: var(--green-200); }
   letter-spacing: 0.08em;
 }
 
-.canvas-section-header--cost span { color: var(--cost-text); }
-.canvas-section-header--labor span { color: var(--hours-text); }
+.canvas-section-header--cost span { color: var(--text-primary); }
+.canvas-section-header--labor span { color: var(--text-primary); }
 .canvas-section-header--pricing span { color: var(--green-300); }
 
 /* ── Sub-section Headers (Material Costs, labor centers, etc.) ── */
@@ -1246,16 +1246,9 @@ a:hover { color: var(--green-200); }
 .canvas-subsection-header--cost .canvas-subsection-label { color: var(--cost-text); }
 .canvas-subsection-header--labor .canvas-subsection-label { color: var(--hours-text); }
 
-/* Empty / inactive sub-sections: smaller and greyed out */
-.canvas-subsection-header--empty {
-  padding: 2px 8px 2px 20px;
-}
-
+/* Empty / inactive sub-sections: slightly smaller but still readable */
 .canvas-subsection-header--empty .canvas-subsection-label {
-  font-size: 0.62rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 /* Inline "+" button for empty sub-sections */
