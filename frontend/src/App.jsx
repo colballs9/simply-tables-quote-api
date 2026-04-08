@@ -27,7 +27,10 @@ export default function App() {
         <aside className={`app-sidebar${collapsed ? ' app-sidebar--collapsed' : ''}`}>
           <div className="sidebar-top">
             <div className="sidebar-logo">
-              {collapsed ? 'ST' : <>Simply Tables <span>Quotes</span></>}
+              {collapsed
+                ? <img src="/favicon.png" alt="ST" className="sidebar-logo-icon" />
+                : <img src="/logo.png" alt="Simply Tables" className="sidebar-logo-img" />
+              }
             </div>
             <button className="sidebar-toggle" onClick={() => setCollapsed(v => !v)} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
               {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}

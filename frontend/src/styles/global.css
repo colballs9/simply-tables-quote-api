@@ -183,25 +183,28 @@ a:hover { color: var(--green-700); }
 }
 
 .sidebar-logo {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--accent-text);
   padding: 8px 12px;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-logo-img {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+}
+
+.sidebar-logo-icon {
+  height: 28px;
+  width: 28px;
+  object-fit: contain;
 }
 
 .app-sidebar--collapsed .sidebar-logo {
-  font-size: 0.9rem;
   padding: 4px 0;
-  text-align: center;
+  justify-content: center;
   width: 100%;
-}
-
-.sidebar-logo span {
-  color: var(--text-secondary);
-  font-weight: 400;
 }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
