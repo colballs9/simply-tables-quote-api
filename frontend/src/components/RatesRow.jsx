@@ -17,8 +17,6 @@ const MARGIN_FIELDS = [
 ]
 
 const RATE_ROWS = [
-  { key: 'hourly_rate', label: 'Hourly Rate', type: 'number', step: '5', format: 'dollar' },
-  { key: 'final_adjustment_rate', label: 'Final Adjustment', type: 'number', step: '0.05', format: 'raw' },
   ...MARGIN_FIELDS.map(f => ({ key: f.key, label: f.label, type: 'percent', step: '0.5' })),
 ]
 

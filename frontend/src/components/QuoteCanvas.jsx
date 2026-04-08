@@ -247,7 +247,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           <span>Pricing</span>
         </div>
 
-        <PricingRow products={sortedProducts} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />
+        <PricingRow products={sortedProducts} activeOption={activeOption} quote={quote} onQuoteUpdate={onQuoteUpdate} />
       </div>
     </div>
   )
