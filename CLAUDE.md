@@ -67,6 +67,21 @@ These rules exist because we've hit these bugs multiple times. Every new compone
 
 13. **Material fields.** "Material Group" = the type (Hardwood, Stone, etc). "Material" = the specific species/stone (Walnut, Quartz, etc). Use `MaterialSearch` component for the Material field with autocomplete from `material_context` API.
 
+### Quality & Process Rules
+
+14. **Trace the full user flow before writing code.** For any new feature, mentally walk through: "user clicks X → what API call fires → what does the backend do → what comes back → what re-renders → what could break." This catches async crashes, missing props, and state clobbering before they become bugs.
+
+15. **Verify prop threading across component boundaries.** When adding a new prop, trace it from where it originates (usually QuoteBuilder) through every intermediate component down to where it's consumed. Missing a forwarding step is a common bug source. Check: QuoteBuilder → QuoteCanvas → BlockRow/PricingRow/RatesRow → child cells.
+
+16. **Don't remove working code without understanding why it exists.** Before deleting a component, section, or function, ask: "what did this do for the user?" If moving functionality (e.g. block configs from canvas to sidebar), verify the new location preserves all capabilities of the old one.
+
+17. **Audit every new backend endpoint for async safety before committing.** Checklist:
+    - Does it use `db.get()` then access a relationship? → Use `selectinload()` instead
+    - Does it create an ORM object then access its relationships? → Flush + reload or query directly
+    - Does it iterate a collection that might not be eagerly loaded? → Verify the load path
+
+18. **Copy patterns from existing battle-tested components, don't write from scratch.** When creating a new input, copy from `PcolText`/`PcolNum`. New block cell? Copy from `UnitMemberCell`. New pricing row? Copy from `HourlyRateCell`. These patterns have been debugged through multiple iterations — starting from them prevents reinventing the same bugs.
+
 ---
 
 ## Current State
