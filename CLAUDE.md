@@ -20,6 +20,55 @@ Before making changes, read in this order:
 
 ---
 
+## Build Rules — FOLLOW THESE EXACTLY
+
+These rules exist because we've hit these bugs multiple times. Every new component, input, endpoint, or agent-built code MUST follow them.
+
+### Frontend Input Rules
+
+1. **NEVER save on every keystroke.** Every text and number input MUST use local state (`useState`) and save on blur (`onBlur`). The `onChange` handler only updates local state — never calls an API. Selects (`<select>`) are the ONE exception (single action, not per-keystroke).
+
+2. **ALWAYS use the `useSpreadsheetInput` hook** (`frontend/src/hooks/useSpreadsheetInput.js`) on every text and number input. It provides:
+   - `onFocus`: selects all text (click to replace, like a spreadsheet cell)
+   - `onKeyDown`: Enter commits (blurs), Escape reverts to original value and blurs
+   - Wire it: `onFocus={e => { focusRef.current = field; ss.onFocus(e) }}` and `onKeyDown={ss.onKeyDown}`
+
+3. **ALWAYS use a focusRef guard** to prevent API responses from overwriting the input the user is actively typing in. Pattern:
+   ```jsx
+   const focusRef = useRef(null)
+   // On focus: focusRef.current = fieldName
+   // On blur: focusRef.current = null
+   // When syncing from props: skip if focusRef.current === fieldName
+   ```
+
+4. **Sync from props only when identity changes or field is NOT focused.** Use a `prevIdRef` to detect when the parent object (product, block) changes identity. Use the focusRef to skip syncing focused fields. Never use `useEffect` with prop values as deps for input sync — it fires too often and causes flicker.
+
+5. **Product column inputs** use `PcolText`, `PcolNum`, `PcolSelect` sub-components in `ProductColumn.jsx`. Follow their pattern for any new product fields.
+
+### Frontend Mutation Rules
+
+6. **Checkbox race condition protection.** `QuoteBuilder.refreshQuote` applies the mutation response immediately, then schedules a debounced re-fetch (300ms) to catch concurrent mutations. All mutation callbacks flow through this — never bypass it with a direct `setQuote()`.
+
+7. **Block member toggles** use a `toggling` state to prevent concurrent toggles within the same block. See `BlockRow.jsx`.
+
+### Backend Async Rules
+
+8. **NEVER access an ORM relationship on an object fetched with bare `db.get()`.** It triggers a synchronous lazy load which crashes with `MissingGreenlet` in async SQLAlchemy + asyncpg. Always use `selectinload()` in the query, or query the child table directly.
+
+9. **After pipelines create new blocks/members, ALWAYS flush and reload** the full quote via `load_full_quote()` before passing to the calc engine. New blocks appended to `quote.quote_blocks` don't have their `members` relationship eagerly loaded — iterating them crashes.
+
+10. **Never call `block.members.append(m)` on a newly created block** in async context. Use `db.add(m)` with the foreign key set — the relationship will be populated on the next `load_full_quote()` call.
+
+### General Build Rules
+
+11. **Test before pushing.** Run `python3 -m pytest test_calc_engine.py -q` and `npx vite build` (in `frontend/`). Both must pass clean.
+
+12. **Stable sorting.** Product and block lists must use `sort_order` then `id` (string compare) for deterministic order. Use `useMemo` to prevent unnecessary re-renders from re-sorting on every render.
+
+13. **Material fields.** "Material Group" = the type (Hardwood, Stone, etc). "Material" = the specific species/stone (Walnut, Quartz, etc). Use `MaterialSearch` component for the Material field with autocomplete from `material_context` API.
+
+---
+
 ## Current State
 
 ### What's Built (April 2026)
