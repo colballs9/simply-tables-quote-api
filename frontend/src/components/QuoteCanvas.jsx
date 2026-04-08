@@ -1,7 +1,9 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import { products, quoteBlocks, tags as tagsApi } from '../api/client'
 import ProductHeaderRow from './ProductHeaderRow'
+import ProductFieldRow from './ProductFieldRow'
+import MaterialBuilder from './MaterialBuilder'
 import BlockRow from './BlockRow'
 import RatesRow from './RatesRow'
 import PricingRow from './PricingRow'
@@ -16,6 +18,12 @@ function stableSort(items) {
 }
 
 /* ── Section definitions ── */
+
+const MATERIAL_TYPES = ['Hardwood', 'Stone', 'Live Edge', 'Laminate', 'Wood Edge Laminate', 'Outdoor', 'Other']
+const SHAPES = ['Standard', 'DIA', 'Custom Shape', 'Base Only']
+const HEIGHTS = ['Dining Height', 'Counter Height', 'Bar Height', 'Top Only', 'Custom Height']
+const BASE_TYPES = ['Stock Base', 'Custom Base', 'Top Only']
+const THICKNESSES = ['', '.75"', '1"', '1.25"', '1.5"', '1.75"', '2"', '2.25"', '2.5"']
 
 const COST_SECTIONS = [
   { key: 'material', label: 'Material Costs', categories: ['species', 'stone'] },
@@ -38,7 +46,6 @@ const LABOR_SECTIONS = [
   { lc: 'LC111', label: '111 Packing + Loading' },
 ]
 
-/* Default cost_category when adding a block to each cost section */
 const COST_SECTION_DEFAULTS = {
   material: 'species',
   base: 'stock_base',
@@ -48,18 +55,20 @@ const COST_SECTION_DEFAULTS = {
 export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const [error, setError] = useState(null)
   const [availableTags, setAvailableTags] = useState([])
+  const [specsOpen, setSpecsOpen] = useState(true)
+  const [descOpen, setDescOpen] = useState(false)
+  const [mbOpen, setMbOpen] = useState(false)
   const productList = activeOption?.products || []
 
-  // Fetch tags once on mount
   useEffect(() => {
     tagsApi.list().then(setAvailableTags).catch(err => console.error('Failed to load tags:', err))
   }, [])
 
   const sortedProducts = useMemo(() => stableSort(productList), [productList])
+  const optionId = activeOption?.id
 
   const allBlocks = quote?.quote_blocks || []
 
-  /* Group cost blocks by section */
   const costBlocksBySection = useMemo(() => {
     const costBlocks = allBlocks.filter(b => b.block_domain === 'cost')
     const grouped = {}
@@ -71,7 +80,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
     return grouped
   }, [allBlocks])
 
-  /* Group labor blocks by labor_center */
   const laborBlocksByLC = useMemo(() => {
     const laborBlocks = allBlocks.filter(b => b.block_domain === 'labor')
     const grouped = {}
@@ -82,6 +90,11 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
     }
     return grouped
   }, [allBlocks])
+
+  // Check if any product needs conditional fields
+  const anyCustomShape = sortedProducts.some(p => p.shape === 'Custom Shape')
+  const anyCustomHeight = sortedProducts.some(p => p.height_name === 'Custom Height')
+  const anyHardwood = sortedProducts.some(p => p.material_type === 'Hardwood' || p.material_type === 'Live Edge')
 
   async function handleAddProduct() {
     if (!activeOption) {
@@ -151,13 +164,67 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           gridTemplateColumns: `240px repeat(${sortedProducts.length}, 200px) auto`,
         }}
       >
-        {/* Product header row */}
+        {/* ═══ PRODUCT TITLE ROW ═══ */}
         <ProductHeaderRow
           products={sortedProducts}
           activeOption={activeOption}
           onQuoteUpdate={onQuoteUpdate}
           onAddProduct={handleAddProduct}
         />
+
+        {/* ═══ SPECS SECTION ═══ */}
+        <SectionHeader label="Specs" open={specsOpen} onToggle={() => setSpecsOpen(v => !v)} />
+
+        {specsOpen && (
+          <>
+            <ProductFieldRow label="Material Group" fieldKey="material_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={MATERIAL_TYPES} />
+            <ProductFieldRow label="Material" fieldKey="material_detail" fieldType="materialSearch" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            <ProductFieldRow label="Qty" fieldKey="quantity" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="1" />
+            <ProductFieldRow label="Width" fieldKey="width" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="0.25" />
+            <ProductFieldRow label="Length" fieldKey="length" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="0.25" />
+            <ProductFieldRow label="Shape" fieldKey="shape" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={SHAPES} />
+            {anyCustomShape && (
+              <ProductFieldRow label="Shape Detail" fieldKey="shape_custom" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            )}
+            <ProductFieldRow label="Height" fieldKey="height_name" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={HEIGHTS} />
+            {anyCustomHeight && (
+              <ProductFieldRow label="Height (in)" fieldKey="height_input" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            )}
+            <ProductFieldRow label="Base" fieldKey="base_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={BASE_TYPES} />
+            {anyHardwood && (
+              <ProductFieldRow label="Thickness" fieldKey="lumber_thickness" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={THICKNESSES} optionLabels={THICKNESSES.map(t => t || '\u2014')} />
+            )}
+            <ProductFieldRow label="Bases/Top" fieldKey="bases_per_top" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="1" />
+          </>
+        )}
+
+        {/* ═══ DESCRIPTIONS SECTION ═══ */}
+        <SectionHeader label="Descriptions" open={descOpen} onToggle={() => setDescOpen(v => !v)} />
+
+        {descOpen && (
+          <>
+            <ProductFieldRow label="Edge Profile" fieldKey="edge_profile" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            <ProductFieldRow label="Stain/Color" fieldKey="stain_or_color" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            <ProductFieldRow label="Color Name" fieldKey="color_name" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            <ProductFieldRow label="Sheen" fieldKey="sheen" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            <ProductFieldRow label="Notes" fieldKey="notes" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+          </>
+        )}
+
+        {/* ═══ MATERIAL BUILDER SECTION ═══ */}
+        <SectionHeader label="Material Builder" open={mbOpen} onToggle={() => setMbOpen(v => !v)} />
+
+        {mbOpen && (
+          <>
+            <div className="canvas-cell canvas-cell--label canvas-cell--field-label" />
+            {sortedProducts.map(product => (
+              <div key={product.id} className="canvas-cell canvas-cell--value canvas-cell--field-value" style={{ alignItems: 'flex-start' }}>
+                <MaterialBuilder product={product} onQuoteUpdate={onQuoteUpdate} compact />
+              </div>
+            ))}
+            <div className="canvas-cell canvas-cell--spacer" />
+          </>
+        )}
 
         {/* ═══ COST BLOCKS ═══ */}
         <div className="canvas-section-header canvas-section-header--cost" style={{ gridColumn: '1 / -1' }}>
@@ -169,7 +236,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           const isEmpty = blocks.length === 0
           return (
             <div key={section.key} className="canvas-subsection" style={{ gridColumn: '1 / -1', display: 'contents' }}>
-              {/* Sub-section header */}
               <div
                 className={`canvas-subsection-header canvas-subsection-header--cost ${isEmpty ? 'canvas-subsection-header--empty' : ''}`}
                 style={{ gridColumn: '1 / -1' }}
@@ -184,7 +250,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                 </button>
               </div>
 
-              {/* Blocks in this section */}
               {blocks.map(block => (
                 <BlockRow
                   key={block.id}
@@ -209,7 +274,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           const isEmpty = blocks.length === 0
           return (
             <div key={section.lc} className="canvas-subsection" style={{ gridColumn: '1 / -1', display: 'contents' }}>
-              {/* Sub-section header */}
               <div
                 className={`canvas-subsection-header canvas-subsection-header--labor ${isEmpty ? 'canvas-subsection-header--empty' : ''}`}
                 style={{ gridColumn: '1 / -1' }}
@@ -224,7 +288,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                 </button>
               </div>
 
-              {/* Blocks in this section */}
               {blocks.map(block => (
                 <BlockRow
                   key={block.id}
@@ -242,7 +305,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
         {/* Rates section (collapsible) */}
         <RatesRow products={sortedProducts} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />
 
-        {/* Pricing section header */}
+        {/* Pricing section */}
         <div className="canvas-section-header canvas-section-header--pricing" style={{ gridColumn: '1 / -1' }}>
           <span>Pricing</span>
         </div>
@@ -250,5 +313,25 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
         <PricingRow products={sortedProducts} activeOption={activeOption} quote={quote} onQuoteUpdate={onQuoteUpdate} />
       </div>
     </div>
+  )
+}
+
+
+function SectionHeader({ label, open, onToggle }) {
+  return (
+    <>
+      <div
+        className="canvas-cell canvas-cell--label canvas-cell--section-toggle"
+        onClick={onToggle}
+        style={{ cursor: 'pointer' }}
+      >
+        <span className="canvas-section-toggle-label">
+          {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+          {label}
+        </span>
+      </div>
+      {/* Empty cells for product columns + spacer */}
+      <div style={{ gridColumn: `2 / -1` }} className="canvas-cell canvas-cell--section-toggle-spacer" />
+    </>
   )
 }

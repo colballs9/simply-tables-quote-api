@@ -14,7 +14,7 @@ const COMPONENT_TYPES = [
 
 const WOOD_TYPES = ['plank', 'leg', 'apron_l', 'apron_w']
 
-export default function MaterialBuilder({ product, onQuoteUpdate }) {
+export default function MaterialBuilder({ product, onQuoteUpdate, compact }) {
   const [open, setOpen] = useState(false)
   const comps = product.components || []
 
@@ -51,6 +51,35 @@ export default function MaterialBuilder({ product, onQuoteUpdate }) {
     } catch (err) {
       console.error('Failed to update component:', err)
     }
+  }
+
+  // Compact mode: no section header, always show content (used in grid row layout)
+  if (compact) {
+    return (
+      <div className="mb-section">
+        {comps.map(comp => (
+          <ComponentRow
+            key={comp.id}
+            comp={comp}
+            productId={product.id}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+          />
+        ))}
+        <div className="mb-add-row">
+          {COMPONENT_TYPES.map(t => (
+            <button
+              key={t.value}
+              className="mb-add-btn"
+              onClick={() => handleAdd(t.value)}
+              title={`Add ${t.label}`}
+            >
+              <Plus size={10} /> {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (

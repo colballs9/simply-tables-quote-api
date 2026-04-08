@@ -1304,6 +1304,101 @@ a:hover { color: var(--green-700); }
   border-color: var(--hours-border);
 }
 
+/* ── Section Toggle Headers (Specs, Descriptions, Material Builder) ── */
+
+.canvas-cell--section-toggle {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.canvas-section-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.canvas-section-toggle-label:hover {
+  color: var(--text-secondary);
+}
+
+.canvas-cell--section-toggle-spacer {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ── Product Field Rows (label + per-product inputs) ── */
+
+.canvas-cell--field-label {
+  padding: 3px 8px 3px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 28px;
+}
+
+.pf-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.canvas-cell--field-value {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 28px;
+  justify-content: stretch;
+}
+
+.pfc-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  width: 100%;
+  min-width: 0;
+}
+
+.pfc-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pfc-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 20px 3px 6px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  width: 100%;
+  min-width: 0;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%239a9490' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+.pfc-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pfc-pct {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
 /* ── Product Header Cells ── */
 
 .canvas-product-header-top {
