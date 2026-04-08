@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
 const LC_LABELS = {
   LC100: 'Handling', LC101: 'Processing', LC102: 'Belt Sand',
@@ -60,6 +61,11 @@ export default function BlockRowLabor({ block, onBlockUpdate }) {
   const isGroup = block.block_type === 'group'
   const isRate = block.block_type === 'rate'
 
+  const ssLabel = useSpreadsheetInput(setLabel)
+  const ssHoursPerUnit = useSpreadsheetInput(setHoursPerUnit)
+  const ssRateValue = useSpreadsheetInput(setRateValue)
+  const ssTotalHours = useSpreadsheetInput(setTotalHours)
+
   function saveLabel() {
     focusRef.current = null
     if (label !== (block.label || '')) {
@@ -100,9 +106,9 @@ export default function BlockRowLabor({ block, onBlockUpdate }) {
           className="canvas-block-label-input"
           value={label}
           onChange={e => setLabel(e.target.value)}
-          onFocus={() => { focusRef.current = 'label' }}
+          onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
           onBlur={saveLabel}
-          onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+          onKeyDown={ssLabel.onKeyDown}
           placeholder="Label..."
         />
         <span className="canvas-block-type-badge">{typeIndicator}</span>
@@ -126,8 +132,9 @@ export default function BlockRowLabor({ block, onBlockUpdate }) {
               step="0.25"
               value={totalHours}
               onChange={e => setTotalHours(e.target.value)}
-              onFocus={() => { focusRef.current = 'totalHours' }}
+              onFocus={e => { focusRef.current = 'totalHours'; ssTotalHours.onFocus(e) }}
               onBlur={saveTotalHours}
+              onKeyDown={ssTotalHours.onKeyDown}
               placeholder="Total hrs"
               title="Total hours"
             />
@@ -149,8 +156,9 @@ export default function BlockRowLabor({ block, onBlockUpdate }) {
               step="0.1"
               value={rateValue}
               onChange={e => setRateValue(e.target.value)}
-              onFocus={() => { focusRef.current = 'rateValue' }}
+              onFocus={e => { focusRef.current = 'rateValue'; ssRateValue.onFocus(e) }}
               onBlur={saveRateValue}
+              onKeyDown={ssRateValue.onKeyDown}
               placeholder="Rate"
               title="Rate value (e.g. sqft/hr)"
             />
@@ -171,8 +179,9 @@ export default function BlockRowLabor({ block, onBlockUpdate }) {
             step="0.01"
             value={hoursPerUnit}
             onChange={e => setHoursPerUnit(e.target.value)}
-            onFocus={() => { focusRef.current = 'hoursPerUnit' }}
+            onFocus={e => { focusRef.current = 'hoursPerUnit'; ssHoursPerUnit.onFocus(e) }}
             onBlur={saveHoursPerUnit}
+            onKeyDown={ssHoursPerUnit.onKeyDown}
             placeholder="hrs/unit"
             title="Hours per unit"
           />

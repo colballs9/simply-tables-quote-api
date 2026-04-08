@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { products as productsApi } from '../api/client'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
 const MARGIN_FIELDS = [
   { key: 'hardwood_margin_rate', label: 'Hardwood Margin' },
@@ -77,6 +78,7 @@ function RateCell({ product, row, optionId, onQuoteUpdate }) {
 
   const [localVal, setLocalVal] = useState(displayValue)
   const focusRef = useRef(null)
+  const ss = useSpreadsheetInput(setLocalVal)
 
   // Sync from props when not focused
   const prevRef = useRef(rawValue)
@@ -109,8 +111,9 @@ function RateCell({ product, row, optionId, onQuoteUpdate }) {
           step={row.step}
           value={localVal}
           onChange={e => setLocalVal(e.target.value)}
-          onFocus={() => { focusRef.current = true }}
+          onFocus={e => { focusRef.current = true; ss.onFocus(e) }}
           onBlur={saveValue}
+          onKeyDown={ss.onKeyDown}
           title={row.label}
         />
         {isPercent && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>%</span>}

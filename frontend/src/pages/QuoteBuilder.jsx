@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, RefreshCw, Trash2 } from 'lucide-react'
 import { quotes, products } from '../api/client'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 import SidePanel from '../components/SidePanel'
 import QuoteCanvas from '../components/QuoteCanvas'
 
@@ -29,6 +30,11 @@ export default function QuoteBuilder() {
 
   // Track whether localDealId has been initialized from a full load
   const dealIdInitRef = useRef(false)
+
+  // Spreadsheet-style input behavior
+  const ssProjectName = useSpreadsheetInput(setLocalProjectName)
+  const ssDealId = useSpreadsheetInput(setLocalDealId)
+  const ssRepRate = useSpreadsheetInput(setLocalRepRate)
 
   // Load or create quote
   useEffect(() => {
@@ -79,16 +85,36 @@ export default function QuoteBuilder() {
     setLoading(false)
   }
 
-  // Generic handler that refreshes quote after any mutation
+  // Applies mutation response immediately, then schedules a debounced re-fetch
+  // to pick up any concurrent mutations that may have been missed.
+  // This prevents the "checkbox revert" bug where two rapid toggles in different
+  // blocks cause the first response to overwrite the second's state.
+  const refetchTimerRef = useRef(null)
+  const quoteIdRef = useRef(null)
+
   const refreshQuote = useCallback((updatedQuote) => {
+    // Apply immediately for responsiveness
     setQuote(updatedQuote)
-    // Don't overwrite localDealId -- local state is authoritative until next full load
     setSelectedOptionId(prev => {
       if (!prev && updatedQuote.options?.[0]?.id) {
         return updatedQuote.options[0].id
       }
       return prev
     })
+
+    // Schedule a debounced re-fetch to catch any concurrent mutations
+    const qid = updatedQuote?.id
+    if (qid) {
+      quoteIdRef.current = qid
+      clearTimeout(refetchTimerRef.current)
+      refetchTimerRef.current = setTimeout(() => {
+        quotes.get(qid).then(fresh => {
+          if (quoteIdRef.current === qid) {
+            setQuote(fresh)
+          }
+        }).catch(() => {})
+      }, 300)
+    }
   }, [])
 
   // Debounced project name save
@@ -181,7 +207,8 @@ export default function QuoteBuilder() {
               value={localProjectName}
               onChange={e => handleProjectNameChange(e.target.value)}
               onBlur={handleProjectNameBlur}
-              onFocus={e => e.target.style.borderBottomColor = 'var(--accent)'}
+              onFocus={e => { e.target.style.borderBottomColor = 'var(--accent)'; ssProjectName.onFocus(e) }}
+              onKeyDown={ssProjectName.onKeyDown}
               placeholder="Project name..."
             />
             <span className="qb-quote-number">
@@ -193,11 +220,13 @@ export default function QuoteBuilder() {
             className="qb-deal-id-input"
             value={localDealId}
             onChange={e => setLocalDealId(e.target.value)}
+            onFocus={ssDealId.onFocus}
             onBlur={() => {
               if (localDealId !== (quote.deal_id || '')) {
                 handleQuoteFieldChange('deal_id', localDealId)
               }
             }}
+            onKeyDown={ssDealId.onKeyDown}
             placeholder="Deal #"
           />
           <select
@@ -226,12 +255,14 @@ export default function QuoteBuilder() {
                 step="0.01"
                 value={localRepRate}
                 onChange={e => setLocalRepRate(e.target.value)}
+                onFocus={ssRepRate.onFocus}
                 onBlur={() => {
                   const val = parseFloat(localRepRate)
                   if (!isNaN(val) && val !== quote.rep_rate) {
                     handleQuoteFieldChange('rep_rate', val)
                   }
                 }}
+                onKeyDown={ssRepRate.onKeyDown}
                 title="Rep rate"
               />
             )}

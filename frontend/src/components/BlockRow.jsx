@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Trash2 } from 'lucide-react'
 import { quoteBlocks } from '../api/client'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 import BlockRowCost from './BlockRowCost'
 import BlockRowLabor from './BlockRowLabor'
 
@@ -17,6 +18,7 @@ function formatHours(val) {
 export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
   const isCost = block.block_domain === 'cost'
   const isUnit = block.block_type === 'unit'
+  const [toggling, setToggling] = useState(null) // product_id being toggled
   const memberMap = {}
   ;(block.members || []).forEach(m => {
     memberMap[m.product_id] = m
@@ -42,6 +44,8 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
   }
 
   async function toggleMember(productId) {
+    if (toggling) return // prevent concurrent toggles
+    setToggling(productId)
     const isMember = !!memberMap[productId]
     try {
       const updated = isMember
@@ -51,6 +55,7 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
     } catch (err) {
       console.error('Failed to toggle member:', err)
     }
+    setToggling(null)
   }
 
   return (
@@ -95,7 +100,8 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
                   <div className="canvas-member-value-stack">
                     <span
                       className={`canvas-computed ${isCost ? 'canvas-computed--cost' : 'canvas-computed--hours'}`}
-                      onClick={() => toggleMember(product.id)}
+                      onClick={() => !toggling && toggleMember(product.id)}
+                      style={toggling ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
                     >
                       {isCost ? formatCost(member.cost_pp) : formatHours(member.hours_pp)}
                       <span className="canvas-unit-pp-label"> pp</span>
@@ -116,6 +122,7 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate }) {
                   type="checkbox"
                   checked={false}
                   onChange={() => toggleMember(product.id)}
+                  disabled={!!toggling}
                   title="Add product to this block"
                   className="canvas-member-checkbox"
                 />
@@ -139,6 +146,7 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
 
   const [localVal, setLocalVal] = useState(String(effectiveValue))
   const focusRef = useRef(null)
+  const ss = useSpreadsheetInput(setLocalVal)
 
   const prevValRef = useRef(effectiveValue)
   if (effectiveValue !== prevValRef.current && !focusRef.current) {
@@ -171,8 +179,9 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
         step={isCost ? '0.01' : '0.01'}
         value={localVal}
         onChange={e => setLocalVal(e.target.value)}
-        onFocus={() => { focusRef.current = true }}
+        onFocus={e => { focusRef.current = true; ss.onFocus(e) }}
         onBlur={saveValue}
+        onKeyDown={ss.onKeyDown}
         title={isCost ? 'Cost per unit' : 'Hours per unit'}
       />
       <span className={`canvas-unit-pp ${isCost ? 'canvas-unit-pp--cost' : 'canvas-unit-pp--hours'}`}>

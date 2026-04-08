@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { products } from '../api/client'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 import MaterialSearch from './MaterialSearch'
 
 const MATERIAL_TYPES = ['Hardwood', 'Stone', 'Live Edge', 'Laminate', 'Wood Edge Laminate', 'Outdoor', 'Other']
@@ -123,6 +124,8 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
     }
   }
 
+  const titleOrigRef = useRef(null)
+
   const dims = []
   if (product.width) dims.push(`${product.width}"`)
   if (product.length) dims.push(`${product.length}"`)
@@ -136,9 +139,12 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
           className="canvas-product-title-input"
           value={locals.title}
           onChange={e => setLocal('title', e.target.value)}
-          onFocus={() => { focusRef.current = 'title' }}
+          onFocus={e => { focusRef.current = 'title'; titleOrigRef.current = e.target.value; e.target.select() }}
           onBlur={() => saveText('title')}
-          onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') e.target.blur()
+            if (e.key === 'Escape') { setLocal('title', titleOrigRef.current || ''); e.target.blur() }
+          }}
           placeholder="Untitled"
           disabled={saving}
         />
@@ -213,6 +219,7 @@ export default function ProductColumn({ product, optionId, onQuoteUpdate }) {
 // -- Sub-components for compact inputs --
 
 function PcolText({ label, field, locals, setLocal, focusRef, onBlur, placeholder, disabled }) {
+  const origRef = useRef(null)
   return (
     <div className="pcol-field">
       <label>{label}</label>
@@ -220,8 +227,12 @@ function PcolText({ label, field, locals, setLocal, focusRef, onBlur, placeholde
         type="text"
         value={locals[field] ?? ''}
         onChange={e => setLocal(field, e.target.value)}
-        onFocus={() => { focusRef.current = field }}
+        onFocus={e => { focusRef.current = field; origRef.current = e.target.value; e.target.select() }}
         onBlur={onBlur}
+        onKeyDown={e => {
+          if (e.key === 'Enter') e.target.blur()
+          if (e.key === 'Escape') { setLocal(field, origRef.current || ''); e.target.blur() }
+        }}
         placeholder={placeholder}
         disabled={disabled}
       />
@@ -230,6 +241,7 @@ function PcolText({ label, field, locals, setLocal, focusRef, onBlur, placeholde
 }
 
 function PcolNum({ label, field, locals, setLocal, focusRef, onBlur, step, disabled }) {
+  const origRef = useRef(null)
   return (
     <div className="pcol-field">
       <label>{label}</label>
@@ -238,8 +250,12 @@ function PcolNum({ label, field, locals, setLocal, focusRef, onBlur, step, disab
         step={step}
         value={locals[field] ?? ''}
         onChange={e => setLocal(field, e.target.value)}
-        onFocus={() => { focusRef.current = field }}
+        onFocus={e => { focusRef.current = field; origRef.current = e.target.value; e.target.select() }}
         onBlur={onBlur}
+        onKeyDown={e => {
+          if (e.key === 'Enter') e.target.blur()
+          if (e.key === 'Escape') { setLocal(field, origRef.current || ''); e.target.blur() }
+        }}
         disabled={disabled}
       />
     </div>

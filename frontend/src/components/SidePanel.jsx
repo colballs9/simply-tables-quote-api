@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { quotes as quotesApi } from '../api/client'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
 const LC_LABELS = {
   LC100: 'Handling', LC101: 'Processing', LC102: 'Belt Sand',
@@ -87,6 +88,7 @@ export default function SidePanel({ quote, activeOption, onOptionSelect, onQuote
   const [laborExpanded, setLaborExpanded] = useState(true)
   const [shippingSaving, setShippingSaving] = useState(false)
   const [localShipping, setLocalShipping] = useState(String(quote?.shipping ?? '0'))
+  const ssShipping = useSpreadsheetInput(setLocalShipping)
 
   const options = quote?.options || []
 
@@ -182,7 +184,9 @@ export default function SidePanel({ quote, activeOption, onOptionSelect, onQuote
             type="number" step="10"
             value={localShipping}
             onChange={e => setLocalShipping(e.target.value)}
+            onFocus={ssShipping.onFocus}
             onBlur={saveShipping}
+            onKeyDown={ssShipping.onKeyDown}
             disabled={shippingSaving}
           />
         </div>

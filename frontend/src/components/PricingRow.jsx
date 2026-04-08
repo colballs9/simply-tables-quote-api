@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { products as productsApi } from '../api/client'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
 function formatPrice(val) {
   if (val == null) return '--'
@@ -54,6 +55,7 @@ function HourlyRateLine({ products, activeOption, onQuoteUpdate }) {
 function HourlyRateCell({ product, optionId, onQuoteUpdate }) {
   const [localVal, setLocalVal] = useState(String(product.hourly_rate ?? 155))
   const focusRef = useRef(null)
+  const ss = useSpreadsheetInput(setLocalVal)
 
   // Sync from props when not focused
   const prevRef = useRef(product.hourly_rate)
@@ -82,8 +84,9 @@ function HourlyRateCell({ product, optionId, onQuoteUpdate }) {
         step="5"
         value={localVal}
         onChange={e => setLocalVal(e.target.value)}
-        onFocus={() => { focusRef.current = true }}
+        onFocus={e => { focusRef.current = true; ss.onFocus(e) }}
         onBlur={saveValue}
+        onKeyDown={ss.onKeyDown}
         title="Hourly rate ($/hr)"
       />
     </div>

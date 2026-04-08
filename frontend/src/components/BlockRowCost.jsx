@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
 const COST_CATEGORIES = [
   { value: 'misc', label: 'Misc' },
@@ -65,6 +66,11 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
 
   const isGroup = block.block_type === 'group'
 
+  const ssLabel = useSpreadsheetInput(setLabel)
+  const ssCostPerUnit = useSpreadsheetInput(setCostPerUnit)
+  const ssTotalAmount = useSpreadsheetInput(setTotalAmount)
+  const ssUnitsPerProduct = useSpreadsheetInput(setUnitsPerProduct)
+
   function saveLabel() {
     focusRef.current = null
     if (label !== (block.label || '')) {
@@ -104,9 +110,9 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
         className="canvas-block-label-input"
         value={label}
         onChange={e => setLabel(e.target.value)}
-        onFocus={() => { focusRef.current = 'label' }}
+        onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
         onBlur={saveLabel}
-        onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+        onKeyDown={ssLabel.onKeyDown}
         placeholder="Label..."
       />
       <div className="canvas-block-fields-row">
@@ -128,8 +134,9 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
               step="1"
               value={totalAmount}
               onChange={e => setTotalAmount(e.target.value)}
-              onFocus={() => { focusRef.current = 'totalAmount' }}
+              onFocus={e => { focusRef.current = 'totalAmount'; ssTotalAmount.onFocus(e) }}
               onBlur={saveTotalAmount}
+              onKeyDown={ssTotalAmount.onKeyDown}
               placeholder="Total $"
               title="Total amount"
             />
@@ -160,8 +167,9 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
               step="0.01"
               value={costPerUnit}
               onChange={e => setCostPerUnit(e.target.value)}
-              onFocus={() => { focusRef.current = 'costPerUnit' }}
+              onFocus={e => { focusRef.current = 'costPerUnit'; ssCostPerUnit.onFocus(e) }}
               onBlur={saveCostPerUnit}
+              onKeyDown={ssCostPerUnit.onKeyDown}
               placeholder="$/unit"
               title="Cost per unit"
             />
@@ -172,8 +180,9 @@ export default function BlockRowCost({ block, onBlockUpdate }) {
                 step="1"
                 value={unitsPerProduct}
                 onChange={e => setUnitsPerProduct(e.target.value)}
-                onFocus={() => { focusRef.current = 'unitsPerProduct' }}
+                onFocus={e => { focusRef.current = 'unitsPerProduct'; ssUnitsPerProduct.onFocus(e) }}
                 onBlur={saveUnitsPerProduct}
+                onKeyDown={ssUnitsPerProduct.onKeyDown}
                 placeholder="qty"
                 title="Units per product (pieces per table)"
                 style={{ width: 50 }}
