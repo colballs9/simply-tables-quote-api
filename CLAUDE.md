@@ -82,6 +82,12 @@ These rules exist because we've hit these bugs multiple times. Every new compone
 
 18. **Copy patterns from existing battle-tested components, don't write from scratch.** When creating a new input, copy from `PcolText`/`PcolNum`. New block cell? Copy from `UnitMemberCell`. New pricing row? Copy from `HourlyRateCell`. These patterns have been debugged through multiple iterations — starting from them prevents reinventing the same bugs.
 
+### Reference Doc Rules
+
+19. **Cross-check reference docs on every change that touches business logic.** Before building anything involving calculations, material handling, field behavior, or pricing, read the relevant section in `Quote_Sheet_Formula_Map.md`, `Domain_Knowledge.md`, or `Field_Reference.md`. These are the source of truth for how the Google Sheet works.
+
+20. **Flag contradictions and gaps — never silently override.** If what you're building contradicts a reference doc, STOP and ask Colin before proceeding. If the docs don't cover the topic, flag the gap. Colin may have context to add. After confirmation, update the reference doc in the same commit as the code change.
+
 ---
 
 ## Current State
