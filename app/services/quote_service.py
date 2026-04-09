@@ -43,7 +43,7 @@ async def load_full_quote(db: AsyncSession, quote_id: uuid.UUID) -> Quote | None
         .options(
             selectinload(Quote.options)
                 .selectinload(QuoteOption.products)
-                .selectinload(Product.components),
+                .selectinload(Product.components)
                 .selectinload(Product.description_items),
             selectinload(Quote.quote_blocks)
                 .selectinload(QuoteBlock.members),
