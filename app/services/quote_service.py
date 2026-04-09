@@ -114,6 +114,7 @@ def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
                         "description": c.description,
                         "width": c.width,
                         "length": c.length,
+                        "depth": c.depth,
                         "thickness": c.thickness,
                         "qty_per_base": c.qty_per_base,
                         "material": c.material,
@@ -281,13 +282,18 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
     Supports multiple species per product (top + components with different species).
     Each species_key gets its own built-in block with per-member cost_per_unit = price_per_bdft
     and units_per_product = bd_ft_pp for that species on that product.
+
+    Pass 1 collects RAW bdft (no waste). Pass 2 upserts species assignments.
+    Pass 2.5 applies the assignment's waste_factor to get final bdft values.
+    Pass 3 upserts blocks with waste-adjusted bdft.
     """
     from decimal import Decimal
 
-    # ── Pass 1: collect species bdft from tops and components ──────────
-    species_total_bdft: dict[str, Decimal] = {}
+    # ── Pass 1: collect RAW species bdft from tops and components ──────
+    # Raw = no waste factor applied. Waste is applied after we have the assignment.
+    species_raw_bdft: dict[str, Decimal] = {}
     species_meta: dict[str, tuple[str, str]] = {}
-    product_species_bdft: dict[str, dict[str, Decimal]] = {}
+    product_species_raw_bdft: dict[str, dict[str, Decimal]] = {}
 
     LUMBER_COMPONENTS = ("plank", "leg", "apron_l", "apron_w")
 
@@ -295,7 +301,7 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
         for product in option.products:
             pid = str(product.id)
             qty = Decimal(str(product.quantity or 1))
-            product_species_bdft[pid] = {}
+            product_species_raw_bdft[pid] = {}
 
             # Top bdft (Hardwood / Live Edge only)
             if product.material_type in ("Hardwood", "Live Edge"):
@@ -310,15 +316,15 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
 
                         w = Decimal(str(product.width or 0))
                         l = Decimal(str(product.length or 0))
-                        bd_ft_pp = Decimal("0")
+                        raw_bd_ft_pp = Decimal("0")
                         if w > 0 and l > 0:
-                            bd_ft_pp = (w * l * raw_thickness / Decimal("144")) * WASTE_FACTOR_TOP
+                            raw_bd_ft_pp = w * l * raw_thickness / Decimal("144")
 
-                        product_species_bdft[pid][species_key] = (
-                            product_species_bdft[pid].get(species_key, Decimal("0")) + bd_ft_pp
+                        product_species_raw_bdft[pid][species_key] = (
+                            product_species_raw_bdft[pid].get(species_key, Decimal("0")) + raw_bd_ft_pp
                         )
-                        species_total_bdft[species_key] = (
-                            species_total_bdft.get(species_key, Decimal("0")) + bd_ft_pp * qty
+                        species_raw_bdft[species_key] = (
+                            species_raw_bdft.get(species_key, Decimal("0")) + raw_bd_ft_pp * qty
                         )
                         species_meta[species_key] = (species_name, quarter_code)
 
@@ -337,29 +343,31 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
                 species_name = comp.material.strip()
                 species_key = f"{species_name} {quarter_code}"
 
+                # Use depth for volume if set, otherwise fall back to lumber thickness
+                depth_val = Decimal(str(comp.depth)) if comp.depth else None
                 thickness_dec = Decimal(str(comp.thickness))
+                dim3 = depth_val if depth_val and depth_val > 0 else thickness_dec
+
                 w = Decimal(str(comp.width or 0))
                 l = Decimal(str(comp.length or 0))
                 qty_per_base = int(comp.qty_per_base or 1)
                 bases_per_top = int(product.bases_per_top or 1)
 
-                bd_ft_per_piece = Decimal("0")
-                if w > 0 and l > 0:
-                    bd_ft_per_piece = (
-                        (w * l * thickness_dec / Decimal("144")) * WASTE_FACTOR_BASE
-                    )
+                raw_bd_ft_per_piece = Decimal("0")
+                if w > 0 and l > 0 and dim3 > 0:
+                    raw_bd_ft_per_piece = w * l * dim3 / Decimal("144")
 
-                comp_bd_ft_pp = bd_ft_per_piece * qty_per_base * bases_per_top
+                raw_comp_bd_ft_pp = raw_bd_ft_per_piece * qty_per_base * bases_per_top
 
-                product_species_bdft[pid][species_key] = (
-                    product_species_bdft[pid].get(species_key, Decimal("0")) + comp_bd_ft_pp
+                product_species_raw_bdft[pid][species_key] = (
+                    product_species_raw_bdft[pid].get(species_key, Decimal("0")) + raw_comp_bd_ft_pp
                 )
-                species_total_bdft[species_key] = (
-                    species_total_bdft.get(species_key, Decimal("0")) + comp_bd_ft_pp * qty
+                species_raw_bdft[species_key] = (
+                    species_raw_bdft.get(species_key, Decimal("0")) + raw_comp_bd_ft_pp * qty
                 )
                 species_meta[species_key] = (species_name, quarter_code)
 
-    if not species_total_bdft:
+    if not species_raw_bdft:
         return
 
     # ── Pass 2: upsert species_assignments ─────────────────────────────
@@ -367,13 +375,13 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
         sa.species_key: sa for sa in quote.species_assignments
     }
     prices: dict[str, Decimal] = {}
+    waste_factors: dict[str, Decimal] = {}
 
-    for species_key, total_bdft in species_total_bdft.items():
+    for species_key, raw_total in species_raw_bdft.items():
         species_name, quarter_code = species_meta[species_key]
 
         if species_key in existing_sa:
             sa = existing_sa[species_key]
-            sa.total_bdft = float(total_bdft)
         else:
             sa = SpeciesAssignment(
                 quote_id=quote.id,
@@ -381,17 +389,34 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
                 quarter_code=quarter_code,
                 species_key=species_key,
                 price_per_bdft=None,
-                total_bdft=float(total_bdft),
+                waste_factor=0.25,
+                total_bdft=None,
                 total_cost=None,
             )
             db.add(sa)
             existing_sa[species_key] = sa
+
+        waste = Decimal(str(sa.waste_factor if sa.waste_factor is not None else 0.25))
+        waste_factors[species_key] = waste
+
+        # Apply waste factor: total_bdft = raw × (1 + waste)
+        waste_mult = Decimal("1") + waste
+        total_bdft = raw_total * waste_mult
+        sa.total_bdft = float(total_bdft)
 
         price = Decimal(str(sa.price_per_bdft or 0))
         sa.total_cost = float(total_bdft * price) if price else None
         prices[species_key] = price
 
     await db.flush()
+
+    # ── Pass 2.5: apply waste to per-product bdft ─────────────────────
+    product_species_bdft: dict[str, dict[str, Decimal]] = {}
+    for pid, raw_map in product_species_raw_bdft.items():
+        product_species_bdft[pid] = {}
+        for species_key, raw_bdft in raw_map.items():
+            waste = waste_factors.get(species_key, Decimal("0.25"))
+            product_species_bdft[pid][species_key] = raw_bdft * (Decimal("1") + waste)
 
     # ── Pass 3: upsert built-in species QuoteBlocks ───────────────────
     # One block per species_key. Members are products that use that species.
@@ -426,7 +451,7 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
         if b.is_builtin and b.block_domain == "cost" and b.cost_category == "species"
     }
 
-    for species_key, total_bdft in species_total_bdft.items():
+    for species_key in species_raw_bdft:
         price = prices.get(species_key, Decimal("0"))
 
         is_new_block = False

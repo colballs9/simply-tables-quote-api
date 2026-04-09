@@ -203,27 +203,37 @@ class TestPanelData:
 class TestComputeComponent:
     """
     Verify compute_component() for Material Builder pieces.
-    Waste factor: WASTE_FACTOR_BASE = 1.25× (base components, known discrepancy vs 1.3× for tops).
+    Waste factor is now applied by the species pipeline, not compute_component.
+    compute_component returns raw volume: L × W × D / 144.
+    If depth is set, it's used; otherwise falls back to thickness.
     """
 
     def test_plank_bdft(self):
         """4" × 48" × 2.0" raw plank, 1 per base, 1 base per top.
-        bd_ft_per_piece = (4 × 48 × 2.0 / 144) × 1.25 = 2.6667 × 1.25 = 3.3333
-        bd_ft_pp = 3.3333 × 1 × 1 = 3.3333"""
+        bd_ft_per_piece = 4 × 48 × 2.0 / 144 = 2.6667
+        bd_ft_pp = 2.6667 × 1 × 1 = 2.6667"""
         comp = {"component_type": "plank", "width": 4, "length": 48, "thickness": 2.0, "qty_per_base": 1}
         product = {"bases_per_top": 1}
         result = compute_component(comp, product)
-        assert abs(result["bd_ft_per_piece"] - Decimal("3.3333")) < Decimal("0.001")
-        assert abs(result["bd_ft_pp"] - Decimal("3.3333")) < Decimal("0.001")
+        assert abs(result["bd_ft_per_piece"] - Decimal("2.6667")) < Decimal("0.001")
+        assert abs(result["bd_ft_pp"] - Decimal("2.6667")) < Decimal("0.001")
+
+    def test_plank_with_depth(self):
+        """6" × 28" beam with depth=6", lumber thickness 2.0" (8/4).
+        bd_ft uses depth, not thickness: 6 × 28 × 6 / 144 = 7.0"""
+        comp = {"component_type": "leg", "width": 6, "length": 28, "depth": 6, "thickness": 2.0, "qty_per_base": 1}
+        product = {"bases_per_top": 1}
+        result = compute_component(comp, product)
+        assert abs(result["bd_ft_per_piece"] - Decimal("7.0")) < Decimal("0.01")
 
     def test_leg_qty_per_base(self):
         """2" × 30" × 2.0" leg, 4 per base, 1 base.
-        bd_ft_per_piece = (2 × 30 × 2.0 / 144) × 1.25 = 0.8333 × 1.25 = 1.0417
-        bd_ft_pp = 1.0417 × 4 × 1 = 4.1667"""
+        bd_ft_per_piece = 2 × 30 × 2.0 / 144 = 0.8333
+        bd_ft_pp = 0.8333 × 4 × 1 = 3.3333"""
         comp = {"component_type": "leg", "width": 2, "length": 30, "thickness": 2.0, "qty_per_base": 4}
         product = {"bases_per_top": 1}
         result = compute_component(comp, product)
-        assert abs(result["bd_ft_pp"] - Decimal("4.1667")) < Decimal("0.001")
+        assert abs(result["bd_ft_pp"] - Decimal("3.3333")) < Decimal("0.001")
 
     def test_bases_per_top_multiplier(self):
         """With 2 bases per top, bdft doubles."""
@@ -314,12 +324,12 @@ class TestComputeComponent:
         result = compute_quote(quote_data)
         prod = result["options"][0]["products"][0]
 
-        # Component should be computed
+        # Component should be computed (raw, no waste — waste applied by species pipeline)
         comp = prod["components"][0]
-        # bd_ft_per_piece = (6 × 48 × 1.5 / 144) × 1.25 = 3.0 × 1.25 = 3.75
-        assert abs(Decimal(str(comp["bd_ft_per_piece"])) - Decimal("3.75")) < Decimal("0.01")
-        # bd_ft_pp = 3.75 × 2 (qty_per_base) × 1 (bases) = 7.5
-        assert abs(Decimal(str(comp["bd_ft_pp"])) - Decimal("7.5")) < Decimal("0.01")
+        # bd_ft_per_piece = 6 × 48 × 1.5 / 144 = 3.0
+        assert abs(Decimal(str(comp["bd_ft_per_piece"])) - Decimal("3.0")) < Decimal("0.01")
+        # bd_ft_pp = 3.0 × 2 (qty_per_base) × 1 (bases) = 6.0
+        assert abs(Decimal(str(comp["bd_ft_pp"])) - Decimal("6.0")) < Decimal("0.01")
 
         # Panel sqft = top (12.0) + plank (6×48/144 × 2 = 4.0) = 16.0
         assert abs(prod["panel_sqft"] - Decimal("16.0")) < Decimal("0.01")

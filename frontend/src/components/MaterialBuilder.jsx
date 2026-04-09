@@ -130,15 +130,17 @@ export default function MaterialBuilder({ product, onQuoteUpdate, compact }) {
 function ComponentRow({ comp, productId, onUpdate, onDelete }) {
   const isWood = WOOD_TYPES.includes(comp.component_type)
 
-  const [width, setWidth] = useState(String(comp.width ?? ''))
   const [length, setLength] = useState(String(comp.length ?? ''))
+  const [width, setWidth] = useState(String(comp.width ?? ''))
+  const [depth, setDepth] = useState(String(comp.depth ?? ''))
   const [qtyPerBase, setQtyPerBase] = useState(String(comp.qty_per_base ?? 1))
   const [material, setMaterial] = useState(comp.material || '')
   const [description, setDescription] = useState(comp.description || '')
   const focusRef = useRef(null)
 
-  const ssWidth = useSpreadsheetInput(setWidth)
   const ssLength = useSpreadsheetInput(setLength)
+  const ssWidth = useSpreadsheetInput(setWidth)
+  const ssDepth = useSpreadsheetInput(setDepth)
   const ssQty = useSpreadsheetInput(setQtyPerBase)
   const ssMaterial = useSpreadsheetInput(setMaterial)
   const ssDescription = useSpreadsheetInput(setDescription)
@@ -146,8 +148,9 @@ function ComponentRow({ comp, productId, onUpdate, onDelete }) {
   // Sync from props when not focused
   const prevRef = useRef(comp)
   if (prevRef.current !== comp) {
-    if (focusRef.current !== 'width') setWidth(String(comp.width ?? ''))
     if (focusRef.current !== 'length') setLength(String(comp.length ?? ''))
+    if (focusRef.current !== 'width') setWidth(String(comp.width ?? ''))
+    if (focusRef.current !== 'depth') setDepth(String(comp.depth ?? ''))
     if (focusRef.current !== 'qtyPerBase') setQtyPerBase(String(comp.qty_per_base ?? 1))
     if (focusRef.current !== 'material') setMaterial(comp.material || '')
     if (focusRef.current !== 'description') setDescription(comp.description || '')
@@ -188,45 +191,50 @@ function ComponentRow({ comp, productId, onUpdate, onDelete }) {
       <div className="mb-fields">
         {comp.component_type !== 'other' ? (
           <>
-            <MBInput label="W" value={width} onChange={setWidth} ss={ssWidth}
-              onFocus={() => { focusRef.current = 'width' }}
-              onBlur={() => saveNum('width', width, setWidth)} step="0.25" />
+            {/* Dimensions: L × W × D */}
             <MBInput label="L" value={length} onChange={setLength} ss={ssLength}
               onFocus={() => { focusRef.current = 'length' }}
               onBlur={() => saveNum('length', length, setLength)} step="0.25" />
-            {isWood && (
-              <div className="mb-field">
-                <label>Lumber</label>
-                <select
-                  className="mb-type-select"
-                  value={String(comp.thickness ?? '')}
-                  onChange={e => {
-                    const val = e.target.value ? parseFloat(e.target.value) : null
-                    onUpdate(comp.id, { thickness: val })
-                  }}
-                >
-                  {LUMBER_THICKNESS_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <MBInput label="W" value={width} onChange={setWidth} ss={ssWidth}
+              onFocus={() => { focusRef.current = 'width' }}
+              onBlur={() => saveNum('width', width, setWidth)} step="0.25" />
+            <MBInput label="D" value={depth} onChange={setDepth} ss={ssDepth}
+              onFocus={() => { focusRef.current = 'depth' }}
+              onBlur={() => saveNum('depth', depth, setDepth)} step="0.25" />
             <MBInput label="Qty" value={qtyPerBase} onChange={setQtyPerBase} ss={ssQty}
               onFocus={() => { focusRef.current = 'qtyPerBase' }}
               onBlur={() => saveNum('qty_per_base', qtyPerBase, setQtyPerBase)} step="1" />
+            {/* Lumber selection: thickness + species (wood types only) */}
             {isWood && (
-              <div className="mb-field">
-                <label>Species</label>
-                <input
-                  type="text"
-                  className="mb-input mb-input--text"
-                  value={material}
-                  onChange={e => setMaterial(e.target.value)}
-                  onFocus={e => { focusRef.current = 'material'; ssMaterial.onFocus(e) }}
-                  onBlur={() => saveText('material', material)}
-                  onKeyDown={ssMaterial.onKeyDown}
-                  placeholder="Species..."
-                />
+              <div className="mb-lumber-row">
+                <div className="mb-field">
+                  <label>Lumber</label>
+                  <select
+                    className="mb-type-select"
+                    value={String(comp.thickness ?? '')}
+                    onChange={e => {
+                      const val = e.target.value ? parseFloat(e.target.value) : null
+                      onUpdate(comp.id, { thickness: val })
+                    }}
+                  >
+                    {LUMBER_THICKNESS_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-field mb-field--wide">
+                  <label>Species</label>
+                  <input
+                    type="text"
+                    className="mb-input mb-input--text"
+                    value={material}
+                    onChange={e => setMaterial(e.target.value)}
+                    onFocus={e => { focusRef.current = 'material'; ssMaterial.onFocus(e) }}
+                    onBlur={() => saveText('material', material)}
+                    onKeyDown={ssMaterial.onKeyDown}
+                    placeholder="Species..."
+                  />
+                </div>
               </div>
             )}
           </>

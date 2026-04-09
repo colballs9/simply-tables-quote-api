@@ -61,7 +61,8 @@ async def update_species_price(
     if not sa:
         raise HTTPException(404, f"Species assignment '{species_key}' not found")
 
-    sa.price_per_bdft = data.price_per_bdft
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(sa, field, value)
     await db.flush()
 
     quote = await recalculate_quote(db, quote_id)

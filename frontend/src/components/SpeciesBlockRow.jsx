@@ -85,9 +85,13 @@ export default function SpeciesBlockRow({ block, products, quoteId, speciesAssig
 
 
 function SpeciesLabel({ block, quoteId, speciesAssignment, pricePer, totalBdft, totalCost, detailOpen, onToggleDetail, onQuoteUpdate }) {
+  const wasteFactor = speciesAssignment?.waste_factor ?? 0.25
+
   const [localPrice, setLocalPrice] = useState(String(pricePer ?? ''))
+  const [localWaste, setLocalWaste] = useState(String(Math.round(wasteFactor * 100)))
   const focusRef = useRef(null)
   const ss = useSpreadsheetInput(setLocalPrice)
+  const ssWaste = useSpreadsheetInput(setLocalWaste)
 
   // Sync from props
   const prevPriceRef = useRef(pricePer)
@@ -96,18 +100,37 @@ function SpeciesLabel({ block, quoteId, speciesAssignment, pricePer, totalBdft, 
   }
   prevPriceRef.current = pricePer
 
-  async function savePrice() {
+  const prevWasteRef = useRef(wasteFactor)
+  if (wasteFactor !== prevWasteRef.current && focusRef.current !== 'waste') {
+    setLocalWaste(String(Math.round(wasteFactor * 100)))
+  }
+  prevWasteRef.current = wasteFactor
+
+  async function saveSpecies(data) {
+    if (!speciesAssignment) return
+    try {
+      const updated = await speciesApi.updatePrice(quoteId, speciesAssignment.species_key, data)
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to update species:', err)
+    }
+  }
+
+  function savePrice() {
     focusRef.current = null
     const val = parseFloat(localPrice)
     if (isNaN(val) || val < 0) return
     if (val === pricePer) return
-    if (!speciesAssignment) return
-    try {
-      const updated = await speciesApi.updatePrice(quoteId, speciesAssignment.species_key, { price_per_bdft: val })
-      onQuoteUpdate(updated)
-    } catch (err) {
-      console.error('Failed to update species price:', err)
-    }
+    saveSpecies({ price_per_bdft: val })
+  }
+
+  function saveWaste() {
+    focusRef.current = null
+    const pct = parseFloat(localWaste)
+    if (isNaN(pct) || pct < 0) return
+    const decimal = pct / 100
+    if (decimal === wasteFactor) return
+    saveSpecies({ waste_factor: decimal })
   }
 
   return (
@@ -131,7 +154,19 @@ function SpeciesLabel({ block, quoteId, speciesAssignment, pricePer, totalBdft, 
         </div>
       </div>
       <div className="species-label-row2">
-        <span className="species-stat species-stat--waste" title="Waste factor">30%</span>
+        <div className="species-waste-wrap" title="Waste factor %">
+          <input
+            className="species-waste-input"
+            type="number"
+            step="1"
+            value={localWaste}
+            onChange={e => setLocalWaste(e.target.value)}
+            onFocus={e => { focusRef.current = 'waste'; ssWaste.onFocus(e) }}
+            onBlur={saveWaste}
+            onKeyDown={ssWaste.onKeyDown}
+          />
+          <span className="species-waste-pct">%</span>
+        </div>
         <span className="species-stat species-stat--bdft" title="Total board feet (with waste)">
           {totalBdft != null ? Number(totalBdft).toFixed(1) : '--'}
         </span>

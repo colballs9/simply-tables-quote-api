@@ -215,21 +215,32 @@ def compute_component(component: dict, product: dict) -> dict:
     - Species pipeline: plank/leg/apron components contribute bdft to their species_key
     - Panel data pipeline: plank/leg components add sqft + count to panel totals
 
-    Waste factor: WASTE_FACTOR_BASE (1.25×) for base components.
-    NOTE: Known discrepancy vs tops (1.3×). Matches current sheet behavior.
+    Dimensions are L × W × D (depth). Board footage = volume:
+        bd_ft_per_piece = (L × W × D / 144) × waste_factor
+
+    If depth is not set, falls back to lumber thickness for backward compatibility.
+
+    Waste factor comes from the species assignment (default 25%), applied in the
+    species pipeline. Here we compute raw volume without waste — the pipeline
+    applies the waste factor when it has access to the species assignment.
 
     Sheet reference: Rows 131–201 (Hardwood Base Material Builder).
     """
     width = _d(component.get("width", 0))
     length = _d(component.get("length", 0))
-    thickness = _d(component.get("thickness", 0))   # raw lumber inches
+    depth = _d(component.get("depth", 0))
+    thickness = _d(component.get("thickness", 0))   # raw lumber inches (for species key)
     qty_per_base = int(component.get("qty_per_base", 1) or 1)
     bases_per_top = int(product.get("bases_per_top", 1) or 1)
 
-    # Board footage per piece: (W × L × T / 144) × waste
-    if width > 0 and length > 0 and thickness > 0:
+    # Use depth for volume; fall back to thickness for legacy flat-board components
+    dim3 = depth if depth > 0 else thickness
+
+    # Board footage per piece: (L × W × D / 144) — raw, no waste
+    # Waste is applied by the species pipeline using the species assignment's waste_factor
+    if width > 0 and length > 0 and dim3 > 0:
         bd_ft_per_piece = _round4(
-            (width * length * thickness / Decimal("144")) * WASTE_FACTOR_BASE
+            (width * length * dim3 / Decimal("144"))
         )
     else:
         bd_ft_per_piece = Decimal("0")

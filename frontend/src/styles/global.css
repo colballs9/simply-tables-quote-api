@@ -2010,11 +2010,33 @@ a:hover { color: var(--green-700); }
   font-weight: 600;
 }
 
-.species-stat--waste {
-  color: var(--text-muted);
+.species-waste-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.species-waste-input {
   background: var(--bg-input);
-  border-radius: 3px;
-  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  width: 36px;
+  text-align: right;
+}
+
+.species-waste-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.species-waste-pct {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
 }
 
 .species-stat--bdft {
@@ -2623,6 +2645,16 @@ a:hover { color: var(--green-700); }
 .mb-input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.mb-lumber-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+  margin-top: 2px;
+  padding-top: 3px;
+  border-top: 1px solid var(--border);
 }
 
 .mb-computed {

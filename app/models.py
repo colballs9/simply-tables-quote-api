@@ -508,10 +508,11 @@ class ProductComponent(Base):
     component_type: Mapped[str] = mapped_column(String, nullable=False)  # plank, leg, apron_l, apron_w, metal_part, other
     description: Mapped[str | None] = mapped_column(Text)
 
-    # Dimensions
+    # Dimensions (L × W × D)
     width: Mapped[float | None] = mapped_column(Numeric(8, 2))
     length: Mapped[float | None] = mapped_column(Numeric(8, 2))
-    thickness: Mapped[float | None] = mapped_column(Numeric(8, 4))  # raw lumber inches
+    depth: Mapped[float | None] = mapped_column(Numeric(8, 2))
+    thickness: Mapped[float | None] = mapped_column(Numeric(8, 4))  # raw lumber inches (4/4, 6/4, etc.)
     qty_per_base: Mapped[int] = mapped_column(Integer, default=1)
     material: Mapped[str | None] = mapped_column(String)  # species name or material type
 
@@ -570,6 +571,7 @@ class SpeciesAssignment(Base):
     quarter_code: Mapped[str] = mapped_column(String, nullable=False)   # '8/4', '6/4'
     species_key: Mapped[str] = mapped_column(String, nullable=False)    # 'Walnut 8/4'
     price_per_bdft: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    waste_factor: Mapped[float | None] = mapped_column(Numeric(5, 4), default=0.25)  # 0.25 = 25%
 
     # Computed
     total_bdft: Mapped[float | None] = mapped_column(Numeric(12, 4))

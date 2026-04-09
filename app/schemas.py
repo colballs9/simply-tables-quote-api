@@ -79,7 +79,8 @@ class ComponentCreate(BaseModel):
     description: Optional[str] = None
     width: Optional[float] = None
     length: Optional[float] = None
-    thickness: Optional[float] = None   # raw lumber inches
+    depth: Optional[float] = None       # physical depth (inches)
+    thickness: Optional[float] = None   # raw lumber inches (4/4, 6/4, etc.)
     qty_per_base: int = 1
     material: Optional[str] = None      # species name or material type
 
@@ -90,6 +91,7 @@ class ComponentUpdate(BaseModel):
     description: Optional[str] = None
     width: Optional[float] = None
     length: Optional[float] = None
+    depth: Optional[float] = None
     thickness: Optional[float] = None
     qty_per_base: Optional[int] = None
     material: Optional[str] = None
@@ -104,6 +106,7 @@ class ComponentRead(BaseModel):
     description: Optional[str] = None
     width: Optional[float] = None
     length: Optional[float] = None
+    depth: Optional[float] = None
     thickness: Optional[float] = None
     qty_per_base: int
     material: Optional[str] = None
@@ -588,12 +591,14 @@ class SpeciesAssignmentRead(BaseModel):
     quarter_code: str
     species_key: str
     price_per_bdft: Optional[float] = None
+    waste_factor: Optional[float] = 0.25
     total_bdft: Optional[float] = None
     total_cost: Optional[float] = None
 
 
 class SpeciesAssignmentUpdate(BaseModel):
-    price_per_bdft: float
+    price_per_bdft: Optional[float] = None
+    waste_factor: Optional[float] = None
 
 
 # ──────────────────────────────────────────────────────────────────────
