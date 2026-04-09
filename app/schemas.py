@@ -275,6 +275,7 @@ class ProductCreate(BaseModel):
     material_type: str
     material_detail: Optional[str] = None
     lumber_thickness: Optional[str] = None
+    stone_group: Optional[int] = None
     base_type: str = "Stock Base"
     base_vendor: Optional[str] = None
     base_style: Optional[str] = None
@@ -314,6 +315,7 @@ class ProductUpdate(BaseModel):
     material_type: Optional[str] = None
     material_detail: Optional[str] = None
     lumber_thickness: Optional[str] = None
+    stone_group: Optional[int] = None
     base_type: Optional[str] = None
     base_vendor: Optional[str] = None
     base_style: Optional[str] = None
@@ -367,6 +369,7 @@ class ProductRead(BaseModel):
     material_type: str
     material_detail: Optional[str] = None
     lumber_thickness: Optional[str] = None
+    stone_group: Optional[int] = None
     base_type: str
     base_vendor: Optional[str] = None
     base_style: Optional[str] = None

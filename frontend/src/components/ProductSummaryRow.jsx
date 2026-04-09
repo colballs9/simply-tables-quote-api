@@ -1,7 +1,7 @@
 /**
  * Read-only summary row showing dims, shape, material, base type per product.
  */
-export default function ProductSummaryRow({ products, stoneGroupNumbers }) {
+export default function ProductSummaryRow({ products }) {
   return (
     <>
       <div className="canvas-cell canvas-cell--label canvas-cell--field-label">
@@ -16,8 +16,7 @@ export default function ProductSummaryRow({ products, stoneGroupNumbers }) {
         const dimLine = [dimStr, height].filter(Boolean).join(' x ')
 
         const isStone = product.material_type && product.material_type.startsWith('Stone')
-        const stoneKey = (product.material_detail || 'Stone').trim()
-        const stoneNum = isStone ? stoneGroupNumbers?.[stoneKey] : null
+        const stoneNum = isStone ? product.stone_group : null
 
         return (
           <div key={product.id} className="canvas-cell canvas-cell--value canvas-cell--field-value">

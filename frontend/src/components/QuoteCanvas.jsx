@@ -147,13 +147,6 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
     return map
   }, [quote?.stone_assignments])
 
-  // Stone group numbering: stone_key → group number (1, 2, 3...)
-  const stoneGroupNumbers = useMemo(() => {
-    const map = {}
-    const keys = Object.keys(stoneAssignmentMap).sort()
-    keys.forEach((key, i) => { map[key] = i + 1 })
-    return map
-  }, [stoneAssignmentMap])
 
   const costBlocksBySection = useMemo(() => {
     const costBlocks = allBlocks.filter(b => b.block_domain === 'cost')
@@ -259,7 +252,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
         />
 
         {/* ═══ SUMMARY ═══ */}
-        <ProductSummaryRow products={sortedProducts} stoneGroupNumbers={stoneGroupNumbers} />
+        <ProductSummaryRow products={sortedProducts} />
 
         {/* ═══ TABLE TITLE ═══ */}
         <ProductTitleRow products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
@@ -426,7 +419,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                     products={sortedProducts}
                     quoteId={quote.id}
                     stoneAssignment={stoneAssignmentMap[block.label]}
-                    stoneNumber={stoneGroupNumbers[block.label] || 1}
+                    stoneNumber={parseInt(block.label, 10) || 1}
                     onQuoteUpdate={onQuoteUpdate}
                   />
                 ) : (

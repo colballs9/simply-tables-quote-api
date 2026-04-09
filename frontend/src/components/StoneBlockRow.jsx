@@ -28,6 +28,10 @@ export default function StoneBlockRow({ block, products, quoteId, stoneAssignmen
   const totalCost = stoneAssignment?.total_cost
   const pricePerSqft = totalSqft && totalCost ? totalCost / totalSqft : null
 
+  // Derive stone spec from the first member product's material_detail
+  const firstMemberProduct = products.find(p => memberMap[p.id])
+  const stoneSpec = firstMemberProduct?.material_detail || ''
+
   return (
     <>
       {/* Label cell — sticky left column */}
@@ -37,6 +41,7 @@ export default function StoneBlockRow({ block, products, quoteId, stoneAssignmen
           quoteId={quoteId}
           stoneAssignment={stoneAssignment}
           stoneNumber={stoneNumber}
+          stoneSpec={stoneSpec}
           totalSqft={totalSqft}
           totalCost={totalCost}
           pricePerSqft={pricePerSqft}
@@ -68,7 +73,7 @@ export default function StoneBlockRow({ block, products, quoteId, stoneAssignmen
 }
 
 
-function StoneLabel({ block, quoteId, stoneAssignment, stoneNumber, totalSqft, totalCost, pricePerSqft, onQuoteUpdate }) {
+function StoneLabel({ block, quoteId, stoneAssignment, stoneNumber, stoneSpec, totalSqft, totalCost, pricePerSqft, onQuoteUpdate }) {
   const [localCost, setLocalCost] = useState(String(totalCost ?? ''))
   const focusRef = useRef(null)
   const ss = useSpreadsheetInput(setLocalCost)
@@ -99,7 +104,7 @@ function StoneLabel({ block, quoteId, stoneAssignment, stoneNumber, totalSqft, t
       <div className="species-label-row1">
         <span className="species-name">Stone {stoneNumber}</span>
       </div>
-      <div className="stone-spec-line">{block.label}</div>
+      {stoneSpec && <div className="stone-spec-line">{stoneSpec}</div>}
       <div className="species-label-row2">
         <span className="species-stat species-stat--bdft" title="Total square feet">
           {formatSqft(totalSqft)} <span className="stone-unit">sq ft</span>

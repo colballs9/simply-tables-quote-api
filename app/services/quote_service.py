@@ -647,6 +647,7 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
     import math
 
     # ── Pass 1: collect sqft from Stone products ───────────────────────
+    # Group by stone_group number (user-assigned). Default to 1 if not set.
     stone_total_sqft: dict[str, Decimal] = {}
     product_stone: dict[str, tuple[str, Decimal]] = {}
 
@@ -657,7 +658,8 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
             if not product.width or not product.length:
                 continue
 
-            stone_key = (product.material_detail or "Stone").strip()
+            group_num = product.stone_group or 1
+            stone_key = str(group_num)
             w = Decimal(str(product.width))
             l = Decimal(str(product.length))
             if product.shape == "DIA":

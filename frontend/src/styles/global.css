@@ -1557,6 +1557,37 @@ a:hover { color: var(--green-700); }
   border-color: var(--accent);
 }
 
+.pfc-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.pfc-stone-group {
+  background: var(--bg-input);
+  border: 1px solid var(--cost-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 2px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--cost-text);
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.pfc-stone-group:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pfc-stone-group::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .pfc-pct {
   font-size: 0.65rem;
   color: var(--text-muted);

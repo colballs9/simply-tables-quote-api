@@ -207,6 +207,7 @@ class Product(Base):
     material_type: Mapped[str] = mapped_column(String, nullable=False)
     material_detail: Mapped[str | None] = mapped_column(String)
     lumber_thickness: Mapped[str | None] = mapped_column(String)
+    stone_group: Mapped[int | None] = mapped_column(Integer)
 
     # Base
     base_type: Mapped[str] = mapped_column(String, default="Stock Base")

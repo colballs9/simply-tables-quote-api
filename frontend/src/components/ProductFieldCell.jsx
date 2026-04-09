@@ -70,17 +70,23 @@ export default function ProductFieldCell({
   }
 
   if (isSelect) {
+    const isStone = fieldKey === 'material_type' && (rawValue || '').startsWith('Stone')
     return (
       <div className="canvas-cell canvas-cell--value canvas-cell--field-value">
-        <select
-          className="pfc-select"
-          value={rawValue || options?.[0] || ''}
-          onChange={e => handleSelectChange(e.target.value)}
-        >
-          {(options || []).map((o, i) => (
-            <option key={o} value={o}>{optionLabels ? optionLabels[i] : o}</option>
-          ))}
-        </select>
+        <div className="pfc-select-wrap">
+          <select
+            className="pfc-select"
+            value={rawValue || options?.[0] || ''}
+            onChange={e => handleSelectChange(e.target.value)}
+          >
+            {(options || []).map((o, i) => (
+              <option key={o} value={o}>{optionLabels ? optionLabels[i] : o}</option>
+            ))}
+          </select>
+          {isStone && (
+            <StoneGroupInput product={product} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+          )}
+        </div>
       </div>
     )
   }
@@ -114,5 +120,45 @@ export default function ProductFieldCell({
       />
       {isPercent && <span className="pfc-pct">%</span>}
     </div>
+  )
+}
+
+
+function StoneGroupInput({ product, optionId, onQuoteUpdate }) {
+  const [localGroup, setLocalGroup] = useState(String(product.stone_group ?? ''))
+  const focusRef = useRef(null)
+  const ss = useSpreadsheetInput(setLocalGroup)
+
+  const prevRef = useRef(product.stone_group)
+  if (product.stone_group !== prevRef.current && !focusRef.current) {
+    setLocalGroup(String(product.stone_group ?? ''))
+  }
+  prevRef.current = product.stone_group
+
+  async function save() {
+    focusRef.current = null
+    const val = parseInt(localGroup, 10)
+    if (isNaN(val) || val < 1) return
+    if (val === product.stone_group) return
+    try {
+      const updated = await productsApi.update(optionId, product.id, { stone_group: val })
+      onQuoteUpdate(updated)
+    } catch (e) { console.error(e) }
+  }
+
+  return (
+    <input
+      className="pfc-stone-group"
+      type="number"
+      min="1"
+      step="1"
+      value={localGroup}
+      onChange={e => setLocalGroup(e.target.value)}
+      onFocus={e => { focusRef.current = 'stone_group'; ss.onFocus(e) }}
+      onBlur={save}
+      onKeyDown={ss.onKeyDown}
+      placeholder="#"
+      title="Stone group number"
+    />
   )
 }
