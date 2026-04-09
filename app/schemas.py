@@ -261,6 +261,7 @@ class ProductCreate(BaseModel):
     sort_order: int = 0
     product_group: Optional[str] = None
     title: Optional[str] = None
+    tag_location: Optional[str] = None
     quantity: int = 1
     width: Optional[float] = None
     length: Optional[float] = None
@@ -299,6 +300,7 @@ class ProductUpdate(BaseModel):
     sort_order: Optional[int] = None
     product_group: Optional[str] = None
     title: Optional[str] = None
+    tag_location: Optional[str] = None
     quantity: Optional[int] = None
     width: Optional[float] = None
     length: Optional[float] = None
@@ -351,6 +353,7 @@ class ProductRead(BaseModel):
     sort_order: int
     product_group: Optional[str] = None
     title: Optional[str] = None
+    tag_location: Optional[str] = None
     quantity: int
     width: Optional[float] = None
     length: Optional[float] = None

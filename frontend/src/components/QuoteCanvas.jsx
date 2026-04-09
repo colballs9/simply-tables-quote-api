@@ -2,7 +2,11 @@ import { useMemo, useState, useEffect } from 'react'
 import { Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import { products, quoteBlocks, tags as tagsApi } from '../api/client'
 import ProductHeaderRow from './ProductHeaderRow'
+import ProductSummaryRow from './ProductSummaryRow'
+import ProductTitleRow from './ProductTitleRow'
 import ProductFieldRow from './ProductFieldRow'
+import ProductMultiFieldRow from './ProductMultiFieldRow'
+import ProductMaterialRow from './ProductMaterialRow'
 import MaterialBuilder from './MaterialBuilder'
 import DescriptionSubSection from './DescriptionSubSection'
 import BlockRow from './BlockRow'
@@ -219,7 +223,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           gridTemplateColumns: `240px repeat(${sortedProducts.length}, 200px) auto`,
         }}
       >
-        {/* ═══ PRODUCT TITLE ROW ═══ */}
+        {/* ═══ PRODUCT HEADER ROW ═══ */}
         <ProductHeaderRow
           products={sortedProducts}
           activeOption={activeOption}
@@ -227,27 +231,48 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           onAddProduct={handleAddProduct}
         />
 
+        {/* ═══ SUMMARY ═══ */}
+        <ProductSummaryRow products={sortedProducts} />
+
+        {/* ═══ TABLE TITLE ═══ */}
+        <ProductTitleRow products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+
         {/* ═══ SPECS SECTION ═══ */}
         <SectionHeader label="Specs" open={specsOpen} onToggle={() => setSpecsOpen(v => !v)} />
 
         {specsOpen && (
           <>
             <ProductFieldRow label="Quantity" fieldKey="quantity" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="1" />
-            <ProductFieldRow label="Length" fieldKey="length" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="0.25" />
-            <ProductFieldRow label="Width" fieldKey="width" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="0.25" />
+            <ProductMultiFieldRow
+              label="Length | Width | Height"
+              products={sortedProducts}
+              optionId={optionId}
+              onQuoteUpdate={onQuoteUpdate}
+              fields={[
+                { fieldKey: 'length', fieldType: 'number', step: '0.25', placeholder: 'L' },
+                { fieldKey: 'width', fieldType: 'number', step: '0.25', placeholder: 'W', separator: 'x' },
+                { fieldKey: 'height_name', fieldType: 'select', options: HEIGHTS, separator: 'x' },
+              ]}
+            />
             <ProductFieldRow label="Shape" fieldKey="shape" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={SHAPES} />
-            <ProductFieldRow label="Shape Detail" fieldKey="shape_custom" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            <ProductFieldRow label="Height" fieldKey="height_name" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={HEIGHTS} />
-            {anyCustomHeight && (
-              <ProductFieldRow label="Height (in)" fieldKey="height_input" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            )}
+            <ProductFieldRow label="Shape Detail" fieldKey="shape_custom" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} placeholder="Shape description if custom shape" />
+
+            {/* Divider */}
+            <div className="canvas-cell canvas-cell--label canvas-cell--divider" />
+            <div className="canvas-cell canvas-cell--divider" style={{ gridColumn: `2 / -1` }} />
+
             <ProductFieldRow label="Material Group" fieldKey="material_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={MATERIAL_TYPES} />
-            <ProductFieldRow label="Material" fieldKey="material_detail" fieldType="materialSearch" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            {anyHardwood && (
-              <ProductFieldRow label="Thickness" fieldKey="lumber_thickness" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={THICKNESSES} optionLabels={THICKNESSES.map(t => t || '\u2014')} />
-            )}
-            <ProductFieldRow label="Base Type" fieldKey="base_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={BASE_TYPES} />
-            <ProductFieldRow label="Bases/Top" fieldKey="bases_per_top" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="1" />
+            <ProductMaterialRow products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            <ProductMultiFieldRow
+              label="Base Type | Bases Per Top"
+              products={sortedProducts}
+              optionId={optionId}
+              onQuoteUpdate={onQuoteUpdate}
+              fields={[
+                { fieldKey: 'base_type', fieldType: 'select', options: BASE_TYPES },
+                { fieldKey: 'bases_per_top', fieldType: 'number', step: '1' },
+              ]}
+            />
             <ProductFieldRow label="Indoor / Outdoor" fieldKey="indoor_outdoor" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={INDOOR_OUTDOOR} />
           </>
         )}

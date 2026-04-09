@@ -1304,6 +1304,139 @@ a:hover { color: var(--green-700); }
   border-color: var(--hours-border);
 }
 
+/* ── Summary Block ── */
+
+.product-summary-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  width: 100%;
+}
+
+.product-summary-line {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ── Table Title Row ── */
+
+.title-cell-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.title-input {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+.tag-location-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--neutral-500);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.tag-location-btn:hover {
+  background: var(--neutral-400);
+}
+
+.tag-input {
+  width: 100px;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+/* ── Multi-Field Rows ── */
+
+.multi-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+
+.multi-field-item {
+  display: flex;
+  align-items: center;
+}
+
+.multi-field-sep {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.multi-field-input {
+  width: 55px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.multi-field-select {
+  flex-shrink: 0;
+}
+
+/* ── Material + Lumber Row ── */
+
+.material-lumber-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.material-lumber-row .mat-search-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.lumber-select-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.lumber-select {
+  width: 50px;
+}
+
+.lumber-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Divider Row ── */
+
+.canvas-cell--divider {
+  padding: 0;
+  min-height: auto;
+  height: 1px;
+  border-bottom: 1px solid var(--border);
+  margin: 4px 0;
+}
+
 /* ── Section Toggle Headers (Specs, Descriptions, Material Builder) ── */
 
 .canvas-cell--section-toggle {

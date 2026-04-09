@@ -194,6 +194,7 @@ class Product(Base):
 
     # Core specs
     title: Mapped[str | None] = mapped_column(String)
+    tag_location: Mapped[str | None] = mapped_column(String)
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     width: Mapped[float | None] = mapped_column(Numeric(8, 2))
     length: Mapped[float | None] = mapped_column(Numeric(8, 2))
