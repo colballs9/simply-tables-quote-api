@@ -14,6 +14,15 @@ const COMPONENT_TYPES = [
 
 const WOOD_TYPES = ['plank', 'leg', 'apron_l', 'apron_w']
 
+// Raw thickness (inches) → display label
+const LUMBER_THICKNESS_OPTIONS = [
+  { value: '', label: '\u2014' },
+  { value: '1', label: '4/4' },
+  { value: '1.5', label: '6/4' },
+  { value: '2', label: '8/4' },
+  { value: '2.5', label: '10/4' },
+]
+
 export default function MaterialBuilder({ product, onQuoteUpdate, compact }) {
   const [open, setOpen] = useState(false)
   const comps = product.components || []
@@ -123,7 +132,6 @@ function ComponentRow({ comp, productId, onUpdate, onDelete }) {
 
   const [width, setWidth] = useState(String(comp.width ?? ''))
   const [length, setLength] = useState(String(comp.length ?? ''))
-  const [thickness, setThickness] = useState(String(comp.thickness ?? ''))
   const [qtyPerBase, setQtyPerBase] = useState(String(comp.qty_per_base ?? 1))
   const [material, setMaterial] = useState(comp.material || '')
   const [description, setDescription] = useState(comp.description || '')
@@ -131,7 +139,6 @@ function ComponentRow({ comp, productId, onUpdate, onDelete }) {
 
   const ssWidth = useSpreadsheetInput(setWidth)
   const ssLength = useSpreadsheetInput(setLength)
-  const ssThickness = useSpreadsheetInput(setThickness)
   const ssQty = useSpreadsheetInput(setQtyPerBase)
   const ssMaterial = useSpreadsheetInput(setMaterial)
   const ssDescription = useSpreadsheetInput(setDescription)
@@ -141,7 +148,6 @@ function ComponentRow({ comp, productId, onUpdate, onDelete }) {
   if (prevRef.current !== comp) {
     if (focusRef.current !== 'width') setWidth(String(comp.width ?? ''))
     if (focusRef.current !== 'length') setLength(String(comp.length ?? ''))
-    if (focusRef.current !== 'thickness') setThickness(String(comp.thickness ?? ''))
     if (focusRef.current !== 'qtyPerBase') setQtyPerBase(String(comp.qty_per_base ?? 1))
     if (focusRef.current !== 'material') setMaterial(comp.material || '')
     if (focusRef.current !== 'description') setDescription(comp.description || '')
@@ -189,9 +195,21 @@ function ComponentRow({ comp, productId, onUpdate, onDelete }) {
               onFocus={() => { focusRef.current = 'length' }}
               onBlur={() => saveNum('length', length, setLength)} step="0.25" />
             {isWood && (
-              <MBInput label="T" value={thickness} onChange={setThickness} ss={ssThickness}
-                onFocus={() => { focusRef.current = 'thickness' }}
-                onBlur={() => saveNum('thickness', thickness, setThickness)} step="0.25" />
+              <div className="mb-field">
+                <label>Lumber</label>
+                <select
+                  className="mb-type-select"
+                  value={String(comp.thickness ?? '')}
+                  onChange={e => {
+                    const val = e.target.value ? parseFloat(e.target.value) : null
+                    onUpdate(comp.id, { thickness: val })
+                  }}
+                >
+                  {LUMBER_THICKNESS_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
             )}
             <MBInput label="Qty" value={qtyPerBase} onChange={setQtyPerBase} ss={ssQty}
               onFocus={() => { focusRef.current = 'qtyPerBase' }}
