@@ -1,6 +1,6 @@
 """
 Quotes router — create, list, read, update, delete quotes.
-On create: inherits default rates/margins from system_defaults.
+On create: inherits default hourly rate from system_defaults.
 """
 
 import uuid
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/quotes", tags=["quotes"])
 @router.post("", response_model=QuoteRead, status_code=201)
 async def create_quote(data: QuoteCreate, db: AsyncSession = Depends(get_db)):
     """Create a new quote with a default 'Standard' option.
-    Inherits default rates/margins from system_defaults."""
+    Inherits default hourly rate from system_defaults."""
 
     # Load system defaults for inheritance
     result = await db.execute(select(SystemDefaults).where(SystemDefaults.key == "global"))
@@ -39,16 +39,6 @@ async def create_quote(data: QuoteCreate, db: AsyncSession = Depends(get_db)):
     # Inherit from system defaults if available
     if defaults:
         quote.default_hourly_rate = defaults.hourly_rate
-        quote.default_hardwood_margin_rate = defaults.hardwood_margin_rate
-        quote.default_stone_margin_rate = defaults.stone_margin_rate
-        quote.default_stock_base_margin_rate = defaults.stock_base_margin_rate
-        quote.default_stock_base_ship_margin_rate = defaults.stock_base_ship_margin_rate
-        quote.default_powder_coat_margin_rate = defaults.powder_coat_margin_rate
-        quote.default_custom_base_margin_rate = defaults.custom_base_margin_rate
-        quote.default_unit_cost_margin_rate = defaults.unit_cost_margin_rate
-        quote.default_group_cost_margin_rate = defaults.group_cost_margin_rate
-        quote.default_misc_margin_rate = defaults.misc_margin_rate
-        quote.default_consumables_margin_rate = defaults.consumables_margin_rate
 
     db.add(quote)
     await db.flush()

@@ -30,18 +30,6 @@ class SystemDefaults(Base):
 
     hourly_rate: Mapped[float] = mapped_column(Numeric(8, 2), default=155.00)
 
-    # Margin rates
-    hardwood_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    stone_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
-    stock_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
-    stock_base_ship_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    powder_coat_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.10)
-    custom_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    unit_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    group_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    misc_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
-    consumables_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
-
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
@@ -108,18 +96,8 @@ class Quote(Base):
     sales_tax: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     budget_buffer_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
 
-    # Default rates/margins for new products (inherited from system_defaults at quote creation)
+    # Default rates for new products (inherited from system_defaults at quote creation)
     default_hourly_rate: Mapped[float] = mapped_column(Numeric(8, 2), default=155.00)
-    default_hardwood_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    default_stone_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
-    default_stock_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
-    default_stock_base_ship_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    default_powder_coat_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.10)
-    default_custom_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    default_unit_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    default_group_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    default_misc_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
-    default_consumables_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
 
     # Computed totals
     total_cost: Mapped[float | None] = mapped_column(Numeric(12, 2))
@@ -246,18 +224,6 @@ class Product(Base):
     # Panel data (computed by engine, used for rate labor pipeline)
     panel_sqft: Mapped[float | None] = mapped_column(Numeric(10, 4))
     panel_count: Mapped[int | None] = mapped_column(Integer)
-
-    # Margin rates
-    hardwood_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    stone_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
-    stock_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.25)
-    stock_base_ship_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    powder_coat_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.10)
-    custom_base_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    unit_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    group_cost_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)
-    misc_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
-    consumables_margin_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.00)
 
     # Pricing controls
     hourly_rate: Mapped[float] = mapped_column(Numeric(8, 2), default=155.00)
@@ -396,11 +362,6 @@ class Preset(Base):
     edge_profile: Mapped[str | None] = mapped_column(String)
     stain_or_color: Mapped[str | None] = mapped_column(String)
     sheen: Mapped[str | None] = mapped_column(String)
-
-    # Margin overrides
-    hardwood_margin_rate: Mapped[float | None] = mapped_column(Numeric(5, 4))
-    stone_margin_rate: Mapped[float | None] = mapped_column(Numeric(5, 4))
-    stock_base_margin_rate: Mapped[float | None] = mapped_column(Numeric(5, 4))
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

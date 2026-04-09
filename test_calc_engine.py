@@ -301,16 +301,6 @@ class TestComputeComponent:
                     "bases_per_top": 1,
                     "hourly_rate": 155,
                     "final_adjustment_rate": 1,
-                    "hardwood_margin_rate": "0.05",
-                    "stock_base_margin_rate": "0.25",
-                    "stone_margin_rate": "0.25",
-                    "stock_base_ship_margin_rate": "0.05",
-                    "powder_coat_margin_rate": "0.10",
-                    "custom_base_margin_rate": "0.05",
-                    "unit_cost_margin_rate": "0.05",
-                    "group_cost_margin_rate": "0.05",
-                    "misc_margin_rate": "0.00",
-                    "consumables_margin_rate": "0.00",
                     # 2 planks: 6×48×1.5", 2 per base
                     "components": [
                         {"id": "c1", "component_type": "plank",
@@ -778,9 +768,6 @@ class TestFullQuote:
                             "bases_per_top": 1,
                             "hourly_rate": 155,
                             "final_adjustment_rate": 1,
-                            "hardwood_margin_rate": "0.05",
-                            "stock_base_margin_rate": "0.25",
-                            "stock_base_ship_margin_rate": "0.05",
                         },
                         {
                             "id": "p2",
@@ -793,9 +780,6 @@ class TestFullQuote:
                             "bases_per_top": 1,
                             "hourly_rate": 155,
                             "final_adjustment_rate": 1,
-                            "hardwood_margin_rate": "0.05",
-                            "stock_base_margin_rate": "0.25",
-                            "stock_base_ship_margin_rate": "0.05",
                         },
                     ],
                 },
@@ -943,20 +927,6 @@ class TestFarmhouseKitchen0737:
 
     def _build_quote(self):
         """Build the full Farmhouse Kitchen 0737 quote data structure."""
-        # Common margin rates for this quote (non-default values)
-        margins = {
-            "hardwood_margin_rate": "0.10",       # 10% (default is 5%)
-            "stone_margin_rate": "0.25",
-            "stock_base_margin_rate": "0.25",      # 25% (default) — spec's $385.98 material price confirms default rate
-            "stock_base_ship_margin_rate": "0.05",
-            "powder_coat_margin_rate": "0.10",
-            "custom_base_margin_rate": "0.10",     # 10% (default is 5%)
-            "unit_cost_margin_rate": "0.10",       # 10% (default is 5%)
-            "group_cost_margin_rate": "0.10",      # 10% (default is 5%)
-            "misc_margin_rate": "0.00",
-            "consumables_margin_rate": "0.00",
-        }
-
         products = [
             {
                 "id": "p1", "quantity": 4, "width": 30, "length": 46,
@@ -964,7 +934,7 @@ class TestFarmhouseKitchen0737:
                 "material_type": "Hardwood", "lumber_thickness": '1.75"',
                 "base_type": "Stock Base", "bases_per_top": 1,
                 "hourly_rate": 150, "final_adjustment_rate": 1,
-                **margins,
+
                 "components": [],
             },
             {
@@ -973,7 +943,7 @@ class TestFarmhouseKitchen0737:
                 "material_type": "Hardwood", "lumber_thickness": '1.75"',
                 "base_type": "Stock Base", "bases_per_top": 1,
                 "hourly_rate": 150, "final_adjustment_rate": 1,
-                **margins,
+
                 "components": [],
             },
             {
@@ -982,7 +952,7 @@ class TestFarmhouseKitchen0737:
                 "material_type": "Hardwood", "lumber_thickness": '1.75"',
                 "base_type": "Stock Base", "bases_per_top": 1,
                 "hourly_rate": 150, "final_adjustment_rate": 1,
-                **margins,
+
                 "components": [],
             },
             {
@@ -991,7 +961,7 @@ class TestFarmhouseKitchen0737:
                 "material_type": "Hardwood", "lumber_thickness": '1.75"',
                 "base_type": "Stock Base", "bases_per_top": 2,
                 "hourly_rate": 150, "final_adjustment_rate": 1,
-                **margins,
+
                 "components": [],
             },
             {
@@ -1000,7 +970,7 @@ class TestFarmhouseKitchen0737:
                 "material_type": "Hardwood", "lumber_thickness": '1.75"',
                 "base_type": "Stock Base", "bases_per_top": 1,
                 "hourly_rate": 150, "final_adjustment_rate": 1,
-                **margins,
+
                 "components": [],
             },
             {
@@ -1009,7 +979,7 @@ class TestFarmhouseKitchen0737:
                 "material_type": "Hardwood", "lumber_thickness": '1.75"',
                 "base_type": "Custom Base", "bases_per_top": 1,
                 "hourly_rate": 150, "final_adjustment_rate": 1,
-                **margins,
+
                 "components": [],
             },
         ]
@@ -1761,16 +1731,6 @@ class TestStonePipeline:
                         "bases_per_top": 1,
                         "hourly_rate": 155,
                         "final_adjustment_rate": 1,
-                        "hardwood_margin_rate": "0.05",
-                        "stone_margin_rate": "0.25",
-                        "stock_base_margin_rate": "0.25",
-                        "stock_base_ship_margin_rate": "0.05",
-                        "powder_coat_margin_rate": "0.10",
-                        "custom_base_margin_rate": "0.05",
-                        "unit_cost_margin_rate": "0.05",
-                        "group_cost_margin_rate": "0.05",
-                        "misc_margin_rate": "0.00",
-                        "consumables_margin_rate": "0.00",
                         "components": [],
                     },
                     {
@@ -1782,16 +1742,6 @@ class TestStonePipeline:
                         "bases_per_top": 1,
                         "hourly_rate": 155,
                         "final_adjustment_rate": 1,
-                        "hardwood_margin_rate": "0.05",
-                        "stone_margin_rate": "0.25",
-                        "stock_base_margin_rate": "0.25",
-                        "stock_base_ship_margin_rate": "0.05",
-                        "powder_coat_margin_rate": "0.10",
-                        "custom_base_margin_rate": "0.05",
-                        "unit_cost_margin_rate": "0.05",
-                        "group_cost_margin_rate": "0.05",
-                        "misc_margin_rate": "0.00",
-                        "consumables_margin_rate": "0.00",
                         "components": [],
                     },
                 ],

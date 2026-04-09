@@ -95,17 +95,6 @@ def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
                 "bases_per_top": product.bases_per_top,
                 "hourly_rate": product.hourly_rate,
                 "final_adjustment_rate": product.final_adjustment_rate,
-                # Margin rates
-                "hardwood_margin_rate": product.hardwood_margin_rate,
-                "stone_margin_rate": product.stone_margin_rate,
-                "stock_base_margin_rate": product.stock_base_margin_rate,
-                "stock_base_ship_margin_rate": product.stock_base_ship_margin_rate,
-                "powder_coat_margin_rate": product.powder_coat_margin_rate,
-                "custom_base_margin_rate": product.custom_base_margin_rate,
-                "unit_cost_margin_rate": product.unit_cost_margin_rate,
-                "group_cost_margin_rate": product.group_cost_margin_rate,
-                "misc_margin_rate": product.misc_margin_rate,
-                "consumables_margin_rate": product.consumables_margin_rate,
                 # Components (Material Builder)
                 "components": [
                     {

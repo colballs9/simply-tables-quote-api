@@ -63,23 +63,6 @@ COMPONENT_QUARTER_CODE_LOOKUP: dict[str, str] = {
     "2.5": "10/4",
 }
 
-# Margin rate field name → cost_category mapping
-# Determines which margin rate applies to each cost category
-MARGIN_CATEGORY_MAP: dict[str, str] = {
-    "species":              "hardwood_margin_rate",
-    "stone":                "stone_margin_rate",
-    "stock_base":           "stock_base_margin_rate",
-    "stock_base_shipping":  "stock_base_ship_margin_rate",
-    "powder_coat":          "powder_coat_margin_rate",
-    "unit_cost_base":       "custom_base_margin_rate",
-    "custom_base":          "custom_base_margin_rate",
-    "unit_cost":            "unit_cost_margin_rate",
-    "group_cost":           "group_cost_margin_rate",
-    "group_cost_base":      "group_cost_margin_rate",
-    "misc":                 "misc_margin_rate",
-    "consumables":          "consumables_margin_rate",
-}
-
 
 # ──────────────────────────────────────────────────────────────────────
 # Helpers

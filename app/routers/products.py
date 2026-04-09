@@ -2,7 +2,7 @@
 Products router — add, update, delete products within a quote option.
 Every mutation triggers quote recalculation.
 
-On product create: inherits hourly_rate + margin rates from quote defaults,
+On product create: inherits hourly_rate from quote defaults,
 and adds the new product as a member to all non-builtin quote blocks.
 """
 
@@ -43,17 +43,6 @@ async def add_product(option_id: uuid.UUID, data: ProductCreate, db: AsyncSessio
     # Inherit hourly_rate from quote defaults if not provided
     if product_data.get("hourly_rate") is None:
         product_data["hourly_rate"] = float(quote.default_hourly_rate)
-
-    # Inherit margin rates from quote defaults
-    margin_fields = [
-        "hardwood_margin_rate", "stone_margin_rate", "stock_base_margin_rate",
-        "stock_base_ship_margin_rate", "powder_coat_margin_rate", "custom_base_margin_rate",
-        "unit_cost_margin_rate", "group_cost_margin_rate", "misc_margin_rate",
-        "consumables_margin_rate",
-    ]
-    for field in margin_fields:
-        if field not in product_data or product_data[field] is None:
-            product_data[field] = float(getattr(quote, f"default_{field}"))
 
     product = Product(option_id=option_id, **product_data)
     db.add(product)

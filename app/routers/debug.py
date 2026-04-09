@@ -19,7 +19,7 @@ from ..services.quote_service import load_full_quote, quote_to_engine_format, lo
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-from calc_engine import compute_quote, MARGIN_CATEGORY_MAP
+from calc_engine import compute_quote
 
 router = APIRouter(tags=["debug"])
 
@@ -193,8 +193,7 @@ async def debug_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db
                     formula = f"{cpu} × {units_pp} = {cost_pp}"
                     inputs = {"cost_per_unit": cpu, "units_per_product": units_pp}
 
-                margin_field = MARGIN_CATEGORY_MAP.get(cat, "unit_cost_margin_rate")
-                margin_rate = _f4(product_data.get(margin_field) or 0.05)
+                margin_rate = _f4(member_data.get("margin_rate") or block.get("margin_rate") or 0.05)
                 margin_pp = _f2(cost_pp * margin_rate)
 
                 cost_blocks_debug.append({

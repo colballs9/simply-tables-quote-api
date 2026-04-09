@@ -11,27 +11,7 @@ const HEIGHTS = ['Dining Height', 'Counter Height', 'Bar Height', 'Top Only', 'C
 const BASE_TYPES = ['Stock Base', 'Custom Base', 'Top Only']
 const THICKNESSES = ['', '.75"', '1"', '1.25"', '1.5"', '1.75"', '2"', '2.25"', '2.5"']
 
-const MARGIN_FIELDS = [
-  { key: 'hardwood_margin_rate', label: 'Hardwood' },
-  { key: 'stone_margin_rate', label: 'Stone' },
-  { key: 'stock_base_margin_rate', label: 'Stock Base' },
-  { key: 'stock_base_ship_margin_rate', label: 'SB Shipping' },
-  { key: 'powder_coat_margin_rate', label: 'Powder Coat' },
-  { key: 'custom_base_margin_rate', label: 'Custom Base' },
-  { key: 'unit_cost_margin_rate', label: 'Unit Cost' },
-  { key: 'group_cost_margin_rate', label: 'Group Cost' },
-  { key: 'misc_margin_rate', label: 'Misc' },
-  { key: 'consumables_margin_rate', label: 'Consumables' },
-]
-
-function pct(val) {
-  if (val == null) return ''
-  return (Number(val) * 100).toFixed(1)
-}
-
 function buildLocals(p) {
-  const m = {}
-  MARGIN_FIELDS.forEach(f => { m[f.key] = pct(p[f.key]) })
   return {
     title: p.title || '',
     quantity: String(p.quantity ?? 1),
@@ -49,7 +29,6 @@ function buildLocals(p) {
     height_input: p.height_input || '',
     hourly_rate: String(p.hourly_rate ?? 155),
     final_adjustment_rate: String(p.final_adjustment_rate ?? 1),
-    ...m,
   }
 }
 

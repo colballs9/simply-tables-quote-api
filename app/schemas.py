@@ -24,30 +24,10 @@ class SystemDefaultsRead(BaseModel):
     id: uuid.UUID
     key: str
     hourly_rate: float
-    hardwood_margin_rate: float
-    stone_margin_rate: float
-    stock_base_margin_rate: float
-    stock_base_ship_margin_rate: float
-    powder_coat_margin_rate: float
-    custom_base_margin_rate: float
-    unit_cost_margin_rate: float
-    group_cost_margin_rate: float
-    misc_margin_rate: float
-    consumables_margin_rate: float
 
 
 class SystemDefaultsUpdate(BaseModel):
     hourly_rate: Optional[float] = None
-    hardwood_margin_rate: Optional[float] = None
-    stone_margin_rate: Optional[float] = None
-    stock_base_margin_rate: Optional[float] = None
-    stock_base_ship_margin_rate: Optional[float] = None
-    powder_coat_margin_rate: Optional[float] = None
-    custom_base_margin_rate: Optional[float] = None
-    unit_cost_margin_rate: Optional[float] = None
-    group_cost_margin_rate: Optional[float] = None
-    misc_margin_rate: Optional[float] = None
-    consumables_margin_rate: Optional[float] = None
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -343,17 +323,6 @@ class ProductUpdate(BaseModel):
     bases_per_top: Optional[int] = None
     hourly_rate: Optional[float] = None
     final_adjustment_rate: Optional[float] = None
-    # Margin rates
-    hardwood_margin_rate: Optional[float] = None
-    stone_margin_rate: Optional[float] = None
-    stock_base_margin_rate: Optional[float] = None
-    stock_base_ship_margin_rate: Optional[float] = None
-    powder_coat_margin_rate: Optional[float] = None
-    custom_base_margin_rate: Optional[float] = None
-    unit_cost_margin_rate: Optional[float] = None
-    group_cost_margin_rate: Optional[float] = None
-    misc_margin_rate: Optional[float] = None
-    consumables_margin_rate: Optional[float] = None
 
 
 class ProductRead(BaseModel):
@@ -397,17 +366,6 @@ class ProductRead(BaseModel):
     bases_per_top: int
     hourly_rate: float
     final_adjustment_rate: float
-    # Margin rates
-    hardwood_margin_rate: float
-    stone_margin_rate: float
-    stock_base_margin_rate: float
-    stock_base_ship_margin_rate: float
-    powder_coat_margin_rate: float
-    custom_base_margin_rate: float
-    unit_cost_margin_rate: float
-    group_cost_margin_rate: float
-    misc_margin_rate: float
-    consumables_margin_rate: float
     # Computed dimensions
     sq_ft: Optional[float] = None
     bd_ft: Optional[float] = None
@@ -520,16 +478,6 @@ class QuoteUpdate(BaseModel):
     shipping: Optional[float] = None
     # Quote-level default overrides
     default_hourly_rate: Optional[float] = None
-    default_hardwood_margin_rate: Optional[float] = None
-    default_stone_margin_rate: Optional[float] = None
-    default_stock_base_margin_rate: Optional[float] = None
-    default_stock_base_ship_margin_rate: Optional[float] = None
-    default_powder_coat_margin_rate: Optional[float] = None
-    default_custom_base_margin_rate: Optional[float] = None
-    default_unit_cost_margin_rate: Optional[float] = None
-    default_group_cost_margin_rate: Optional[float] = None
-    default_misc_margin_rate: Optional[float] = None
-    default_consumables_margin_rate: Optional[float] = None
 
 
 class QuoteSummary(BaseModel):
@@ -562,18 +510,8 @@ class QuoteRead(BaseModel):
     rep_rate: float
     status: str
     shipping: float = 0.0
-    # Default rates/margins
+    # Default rates
     default_hourly_rate: float = 155.00
-    default_hardwood_margin_rate: float = 0.05
-    default_stone_margin_rate: float = 0.25
-    default_stock_base_margin_rate: float = 0.25
-    default_stock_base_ship_margin_rate: float = 0.05
-    default_powder_coat_margin_rate: float = 0.10
-    default_custom_base_margin_rate: float = 0.05
-    default_unit_cost_margin_rate: float = 0.05
-    default_group_cost_margin_rate: float = 0.05
-    default_misc_margin_rate: float = 0.00
-    default_consumables_margin_rate: float = 0.00
     # Computed
     total_cost: Optional[float] = None
     total_price: Optional[float] = None
