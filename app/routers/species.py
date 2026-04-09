@@ -38,7 +38,7 @@ async def list_species(quote_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.patch("/{species_key}", response_model=QuoteRead)
+@router.patch("/{species_key:path}", response_model=QuoteRead)
 async def update_species_price(
     quote_id: uuid.UUID,
     species_key: str,
