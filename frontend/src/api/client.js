@@ -89,6 +89,14 @@ export const components = {
   delete: (productId, componentId) => request(`/products/${productId}/components/${componentId}`, { method: 'DELETE' }),
 };
 
+// ── Description Items ──
+
+export const descriptionItems = {
+  add: (productId, data) => request(`/products/${productId}/description-items`, { method: 'POST', body: data }),
+  update: (productId, itemId, data) => request(`/products/${productId}/description-items/${itemId}`, { method: 'PATCH', body: data }),
+  delete: (productId, itemId) => request(`/products/${productId}/description-items/${itemId}`, { method: 'DELETE' }),
+};
+
 // ── Tags ──
 
 export const tags = {

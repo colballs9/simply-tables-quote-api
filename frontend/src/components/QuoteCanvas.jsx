@@ -4,6 +4,7 @@ import { products, quoteBlocks, tags as tagsApi } from '../api/client'
 import ProductHeaderRow from './ProductHeaderRow'
 import ProductFieldRow from './ProductFieldRow'
 import MaterialBuilder from './MaterialBuilder'
+import DescriptionSubSection from './DescriptionSubSection'
 import BlockRow from './BlockRow'
 import RatesRow from './RatesRow'
 import PricingRow from './PricingRow'
@@ -24,6 +25,59 @@ const SHAPES = ['Standard', 'DIA', 'Custom Shape', 'Base Only']
 const HEIGHTS = ['Dining Height', 'Counter Height', 'Bar Height', 'Top Only', 'Custom Height']
 const BASE_TYPES = ['Stock Base', 'Custom Base', 'Top Only']
 const THICKNESSES = ['', '.75"', '1"', '1.25"', '1.5"', '1.75"', '2"', '2.25"', '2.5"']
+const INDOOR_OUTDOOR = ['Indoor', 'Outdoor']
+const STAIN_OPTIONS = ['Stain', 'Natural', 'Paint']
+const SHEEN_OPTIONS = ['', 'Matte', 'Satin', 'Semi-Gloss', 'Gloss']
+const GRAIN_OPTIONS = ['', 'Book Match', 'Slip Match', 'Random', 'Other']
+
+/* ── Top Description fields by material type ── */
+const HARDWOOD_FINISHES = [
+  { label: 'Material', fieldKey: 'material_detail', fieldType: 'text' },
+  { label: 'Style', fieldKey: 'top_description', fieldType: 'text' },
+  { label: 'Stain / Natural', fieldKey: 'stain_or_color', fieldType: 'select', options: STAIN_OPTIONS },
+  { label: 'Stain Color', fieldKey: 'color_name', fieldType: 'text' },
+  { label: 'Sheen', fieldKey: 'sheen', fieldType: 'select', options: SHEEN_OPTIONS, optionLabels: SHEEN_OPTIONS.map(s => s || '\u2014') },
+  { label: 'Grain Direction', fieldKey: 'grain_direction', fieldType: 'select', options: GRAIN_OPTIONS, optionLabels: GRAIN_OPTIONS.map(s => s || '\u2014') },
+]
+
+const STONE_FINISHES = [
+  { label: 'Material', fieldKey: 'material_detail', fieldType: 'text' },
+  { label: 'Manufacturer', fieldKey: 'stone_manufacturer', fieldType: 'text' },
+  { label: 'Color', fieldKey: 'stone_color', fieldType: 'text' },
+  { label: 'Finish / Sheen', fieldKey: 'stone_finish', fieldType: 'text' },
+]
+
+const DEFAULT_FINISHES = [
+  { label: 'Material', fieldKey: 'material_detail', fieldType: 'text' },
+  { label: 'Stain / Color', fieldKey: 'stain_or_color', fieldType: 'text' },
+  { label: 'Color Name', fieldKey: 'color_name', fieldType: 'text' },
+  { label: 'Sheen', fieldKey: 'sheen', fieldType: 'select', options: SHEEN_OPTIONS, optionLabels: SHEEN_OPTIONS.map(s => s || '\u2014') },
+]
+
+const EDGE_FIELDS = [
+  { label: 'Thickness', fieldKey: 'lumber_thickness', fieldType: 'select', options: THICKNESSES, optionLabels: THICKNESSES.map(t => t || '\u2014') },
+  { label: 'Edge Profile', fieldKey: 'edge_profile', fieldType: 'text' },
+]
+
+const OTHER_FIELDS = [
+  { label: 'Notes', fieldKey: 'notes', fieldType: 'text' },
+]
+
+const STOCK_BASE_FIELDS = [
+  { label: 'Vendor', fieldKey: 'base_vendor', fieldType: 'text' },
+  { label: 'Style / Series', fieldKey: 'base_style', fieldType: 'text' },
+  { label: 'Size', fieldKey: 'base_size', fieldType: 'text' },
+  { label: 'Height', fieldKey: 'base_height', fieldType: 'text' },
+  { label: 'Finish / Color', fieldKey: 'base_finish_color', fieldType: 'text' },
+]
+
+const CUSTOM_BASE_FIELDS = [
+  { label: 'Materials', fieldKey: 'base_materials', fieldType: 'text' },
+  { label: 'Style', fieldKey: 'base_style', fieldType: 'text' },
+  { label: 'Size', fieldKey: 'base_size', fieldType: 'text' },
+  { label: 'Finish', fieldKey: 'base_finish', fieldType: 'text' },
+  { label: 'Color', fieldKey: 'base_color', fieldType: 'text' },
+]
 
 const COST_SECTIONS = [
   { key: 'material', label: 'Material Costs', categories: ['species', 'stone'] },
@@ -56,7 +110,8 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const [error, setError] = useState(null)
   const [availableTags, setAvailableTags] = useState([])
   const [specsOpen, setSpecsOpen] = useState(true)
-  const [descOpen, setDescOpen] = useState(false)
+  const [topDescOpen, setTopDescOpen] = useState(false)
+  const [baseDescOpen, setBaseDescOpen] = useState(false)
   const [mbOpen, setMbOpen] = useState(false)
   const productList = activeOption?.products || []
 
@@ -177,37 +232,79 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
 
         {specsOpen && (
           <>
-            <ProductFieldRow label="Material Group" fieldKey="material_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={MATERIAL_TYPES} />
-            <ProductFieldRow label="Material" fieldKey="material_detail" fieldType="materialSearch" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            <ProductFieldRow label="Qty" fieldKey="quantity" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="1" />
-            <ProductFieldRow label="Width" fieldKey="width" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="0.25" />
+            <ProductFieldRow label="Quantity" fieldKey="quantity" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="1" />
             <ProductFieldRow label="Length" fieldKey="length" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="0.25" />
+            <ProductFieldRow label="Width" fieldKey="width" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="0.25" />
             <ProductFieldRow label="Shape" fieldKey="shape" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={SHAPES} />
-            {anyCustomShape && (
-              <ProductFieldRow label="Shape Detail" fieldKey="shape_custom" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            )}
+            <ProductFieldRow label="Shape Detail" fieldKey="shape_custom" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
             <ProductFieldRow label="Height" fieldKey="height_name" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={HEIGHTS} />
             {anyCustomHeight && (
               <ProductFieldRow label="Height (in)" fieldKey="height_input" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
             )}
-            <ProductFieldRow label="Base" fieldKey="base_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={BASE_TYPES} />
+            <ProductFieldRow label="Material Group" fieldKey="material_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={MATERIAL_TYPES} />
+            <ProductFieldRow label="Material" fieldKey="material_detail" fieldType="materialSearch" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
             {anyHardwood && (
               <ProductFieldRow label="Thickness" fieldKey="lumber_thickness" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={THICKNESSES} optionLabels={THICKNESSES.map(t => t || '\u2014')} />
             )}
+            <ProductFieldRow label="Base Type" fieldKey="base_type" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={BASE_TYPES} />
             <ProductFieldRow label="Bases/Top" fieldKey="bases_per_top" fieldType="number" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} step="1" />
+            <ProductFieldRow label="Indoor / Outdoor" fieldKey="indoor_outdoor" fieldType="select" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} options={INDOOR_OUTDOOR} />
           </>
         )}
 
-        {/* ═══ DESCRIPTIONS SECTION ═══ */}
-        <SectionHeader label="Descriptions" open={descOpen} onToggle={() => setDescOpen(v => !v)} />
+        {/* ═══ TOP DESCRIPTIONS ═══ */}
+        <SectionHeader label="Top Descriptions" open={topDescOpen} onToggle={() => setTopDescOpen(v => !v)} />
 
-        {descOpen && (
+        {topDescOpen && (
           <>
-            <ProductFieldRow label="Edge Profile" fieldKey="edge_profile" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            <ProductFieldRow label="Stain/Color" fieldKey="stain_or_color" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            <ProductFieldRow label="Color Name" fieldKey="color_name" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            <ProductFieldRow label="Sheen" fieldKey="sheen" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
-            <ProductFieldRow label="Notes" fieldKey="notes" fieldType="text" products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
+            {/* Material type badge row */}
+            <MaterialTypeBadgeRow products={sortedProducts} />
+
+            <DescriptionSubSection
+              label="Finishes"
+              section="top_finishes"
+              fields={getFinishFields(sortedProducts)}
+              products={sortedProducts}
+              optionId={optionId}
+              onQuoteUpdate={onQuoteUpdate}
+            />
+
+            <DescriptionSubSection
+              label="Edge"
+              section="top_edge"
+              fields={EDGE_FIELDS}
+              products={sortedProducts}
+              optionId={optionId}
+              onQuoteUpdate={onQuoteUpdate}
+            />
+
+            <DescriptionSubSection
+              label="Other"
+              section="top_other"
+              fields={OTHER_FIELDS}
+              products={sortedProducts}
+              optionId={optionId}
+              onQuoteUpdate={onQuoteUpdate}
+            />
+          </>
+        )}
+
+        {/* ═══ BASE DESCRIPTIONS ═══ */}
+        <SectionHeader label="Base Descriptions" open={baseDescOpen} onToggle={() => setBaseDescOpen(v => !v)} />
+
+        {baseDescOpen && (
+          <>
+            {/* Base type badge row */}
+            <BaseTypeBadgeRow products={sortedProducts} />
+
+            <DescriptionSubSection
+              label="Base"
+              section="base"
+              fields={getBaseFields(sortedProducts)}
+              products={sortedProducts}
+              optionId={optionId}
+              onQuoteUpdate={onQuoteUpdate}
+            />
           </>
         )}
 
@@ -332,6 +429,71 @@ function SectionHeader({ label, open, onToggle }) {
       </div>
       {/* Empty cells for product columns + spacer */}
       <div style={{ gridColumn: `2 / -1` }} className="canvas-cell canvas-cell--section-toggle-spacer" />
+    </>
+  )
+}
+
+
+/* ── Helper: pick finish fields based on material types present ── */
+
+function getFinishFields(products) {
+  // If any product is Stone, show stone fields; if any is Hardwood/Live Edge, show hardwood fields
+  // For mixed quotes, show the superset — fields handle per-product visibility via fieldKey existence
+  const hasStone = products.some(p => p.material_type === 'Stone')
+  const hasHardwood = products.some(p => p.material_type === 'Hardwood' || p.material_type === 'Live Edge')
+
+  if (hasStone && !hasHardwood) return STONE_FINISHES
+  if (hasHardwood && !hasStone) return HARDWOOD_FINISHES
+  if (hasStone && hasHardwood) {
+    // Superset: show all unique fields
+    return [...HARDWOOD_FINISHES, ...STONE_FINISHES.filter(sf => !HARDWOOD_FINISHES.some(hf => hf.fieldKey === sf.fieldKey))]
+  }
+  return DEFAULT_FINISHES
+}
+
+
+/* ── Helper: pick base fields based on base types present ── */
+
+function getBaseFields(products) {
+  const hasStock = products.some(p => p.base_type === 'Stock Base')
+  const hasCustom = products.some(p => p.base_type === 'Custom Base')
+
+  if (hasStock && !hasCustom) return STOCK_BASE_FIELDS
+  if (hasCustom && !hasStock) return CUSTOM_BASE_FIELDS
+  // Mixed: show superset
+  return [...STOCK_BASE_FIELDS, ...CUSTOM_BASE_FIELDS.filter(cf => !STOCK_BASE_FIELDS.some(sf => sf.fieldKey === cf.fieldKey))]
+}
+
+
+/* ── Material type badge row ── */
+
+function MaterialTypeBadgeRow({ products }) {
+  return (
+    <>
+      <div className="canvas-cell canvas-cell--label" />
+      {products.map(product => (
+        <div key={product.id} className="canvas-cell canvas-cell--value canvas-cell--badge-row">
+          <span className="desc-material-badge">{product.material_type}</span>
+        </div>
+      ))}
+      <div className="canvas-cell canvas-cell--spacer" />
+    </>
+  )
+}
+
+
+/* ── Base type badge row ── */
+
+function BaseTypeBadgeRow({ products }) {
+  return (
+    <>
+      <div className="canvas-cell canvas-cell--label" />
+      {products.map(product => (
+        <div key={product.id} className="canvas-cell canvas-cell--value canvas-cell--badge-row">
+          <span className="desc-base-badge">{product.base_type}</span>
+        </div>
+      ))}
+      <div className="canvas-cell canvas-cell--spacer" />
     </>
   )
 }

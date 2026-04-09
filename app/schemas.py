@@ -235,6 +235,28 @@ class QuoteBlockRead(BaseModel):
 # Products
 # ──────────────────────────────────────────────────────────────────────
 
+class DescriptionItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    product_id: uuid.UUID
+    section: str
+    item_type: str
+    content: Optional[str] = None
+    sort_order: int
+
+
+class DescriptionItemCreate(BaseModel):
+    section: str          # top_finishes, top_edge, top_other, base
+    item_type: str        # detail, exception
+    content: Optional[str] = None
+    sort_order: int = 0
+
+
+class DescriptionItemUpdate(BaseModel):
+    content: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
 class ProductCreate(BaseModel):
     sort_order: int = 0
     product_group: Optional[str] = None
@@ -253,10 +275,20 @@ class ProductCreate(BaseModel):
     base_vendor: Optional[str] = None
     base_style: Optional[str] = None
     base_size: Optional[str] = None
+    base_height: Optional[str] = None
+    base_finish_color: Optional[str] = None
+    base_materials: Optional[str] = None
+    base_finish: Optional[str] = None
+    base_color: Optional[str] = None
     edge_profile: Optional[str] = None
     stain_or_color: Optional[str] = None
     color_name: Optional[str] = None
     sheen: Optional[str] = None
+    grain_direction: Optional[str] = None
+    stone_manufacturer: Optional[str] = None
+    stone_color: Optional[str] = None
+    stone_finish: Optional[str] = None
+    indoor_outdoor: str = "Indoor"
     notes: Optional[str] = None
     bases_per_top: int = 1
     hourly_rate: Optional[float] = None  # None = inherit from quote defaults
@@ -281,10 +313,20 @@ class ProductUpdate(BaseModel):
     base_vendor: Optional[str] = None
     base_style: Optional[str] = None
     base_size: Optional[str] = None
+    base_height: Optional[str] = None
+    base_finish_color: Optional[str] = None
+    base_materials: Optional[str] = None
+    base_finish: Optional[str] = None
+    base_color: Optional[str] = None
     edge_profile: Optional[str] = None
     stain_or_color: Optional[str] = None
     color_name: Optional[str] = None
     sheen: Optional[str] = None
+    grain_direction: Optional[str] = None
+    stone_manufacturer: Optional[str] = None
+    stone_color: Optional[str] = None
+    stone_finish: Optional[str] = None
+    indoor_outdoor: Optional[str] = None
     notes: Optional[str] = None
     bases_per_top: Optional[int] = None
     hourly_rate: Optional[float] = None
@@ -320,14 +362,28 @@ class ProductRead(BaseModel):
     material_detail: Optional[str] = None
     lumber_thickness: Optional[str] = None
     base_type: str
+    base_vendor: Optional[str] = None
+    base_style: Optional[str] = None
+    base_size: Optional[str] = None
+    base_height: Optional[str] = None
+    base_finish_color: Optional[str] = None
+    base_materials: Optional[str] = None
+    base_finish: Optional[str] = None
+    base_color: Optional[str] = None
     edge_profile: Optional[str] = None
     stain_or_color: Optional[str] = None
+    color_name: Optional[str] = None
     sheen: Optional[str] = None
+    grain_direction: Optional[str] = None
+    stone_manufacturer: Optional[str] = None
+    stone_color: Optional[str] = None
+    stone_finish: Optional[str] = None
+    indoor_outdoor: str = "Indoor"
     notes: Optional[str] = None
     bases_per_top: int
     hourly_rate: float
     final_adjustment_rate: float
-    # Margin rates (returned so UI can display/edit current values)
+    # Margin rates
     hardwood_margin_rate: float
     stone_margin_rate: float
     stock_base_margin_rate: float
@@ -353,6 +409,7 @@ class ProductRead(BaseModel):
     sale_price_total: Optional[float] = None
     # Nested
     components: list[ComponentRead] = []
+    description_items: list[DescriptionItemRead] = []
 
 
 # ──────────────────────────────────────────────────────────────────────

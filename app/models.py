@@ -212,15 +212,29 @@ class Product(Base):
     base_vendor: Mapped[str | None] = mapped_column(String)
     base_style: Mapped[str | None] = mapped_column(String)
     base_size: Mapped[str | None] = mapped_column(String)
+    base_height: Mapped[str | None] = mapped_column(String)
+    base_finish_color: Mapped[str | None] = mapped_column(String)
+    base_materials: Mapped[str | None] = mapped_column(String)
+    base_finish: Mapped[str | None] = mapped_column(String)
+    base_color: Mapped[str | None] = mapped_column(String)
 
-    # Descriptions
+    # Top descriptions
     edge_profile: Mapped[str | None] = mapped_column(String)
     stain_or_color: Mapped[str | None] = mapped_column(String)
     color_name: Mapped[str | None] = mapped_column(String)
     sheen: Mapped[str | None] = mapped_column(String)
+    grain_direction: Mapped[str | None] = mapped_column(String)
     top_description: Mapped[str | None] = mapped_column(Text)
     base_description: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
+
+    # Stone-specific descriptions
+    stone_manufacturer: Mapped[str | None] = mapped_column(String)
+    stone_color: Mapped[str | None] = mapped_column(String)
+    stone_finish: Mapped[str | None] = mapped_column(String)
+
+    # Environment
+    indoor_outdoor: Mapped[str] = mapped_column(String, default="Indoor")
 
     # Computed dimensions
     sq_ft: Mapped[float | None] = mapped_column(Numeric(10, 4))
@@ -266,6 +280,8 @@ class Product(Base):
     components: Mapped[list["ProductComponent"]] = relationship(back_populates="product", cascade="all, delete-orphan",
                                                                 order_by="ProductComponent.sort_order")
     block_memberships: Mapped[list["QuoteBlockMember"]] = relationship(back_populates="product", cascade="all, delete-orphan")
+    description_items: Mapped[list["ProductDescriptionItem"]] = relationship(back_populates="product", cascade="all, delete-orphan",
+                                                                             order_by="ProductDescriptionItem.sort_order")
 
     __table_args__ = (
         Index("idx_products_option", "option_id"),
@@ -511,6 +527,31 @@ class ProductComponent(Base):
 
     __table_args__ = (
         Index("idx_components_product", "product_id"),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Product Description Items (dynamic details + exceptions)
+# ──────────────────────────────────────────────────────────────────────
+
+class ProductDescriptionItem(Base):
+    __tablename__ = "product_description_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"))
+
+    section: Mapped[str] = mapped_column(String, nullable=False)     # top_finishes, top_edge, top_other, base
+    item_type: Mapped[str] = mapped_column(String, nullable=False)   # detail, exception
+    content: Mapped[str | None] = mapped_column(Text)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    product: Mapped["Product"] = relationship(back_populates="description_items")
+
+    __table_args__ = (
+        Index("idx_desc_items_product", "product_id"),
     )
 
 
