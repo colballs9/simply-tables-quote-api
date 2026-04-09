@@ -131,6 +131,7 @@ class QuoteBlockMemberRead(BaseModel):
     hours_per_unit: Optional[float] = None
     cost_per_unit: Optional[float] = None
     units_per_product: Optional[float] = None
+    margin_rate: Optional[float] = None
     is_active: Optional[bool] = None
     # Computed
     cost_pp: Optional[float] = None
@@ -145,6 +146,7 @@ class QuoteBlockMemberUpdate(BaseModel):
     hours_per_unit: Optional[float] = None
     cost_per_unit: Optional[float] = None
     units_per_product: Optional[float] = None
+    margin_rate: Optional[float] = None
     is_active: Optional[bool] = None
 
 

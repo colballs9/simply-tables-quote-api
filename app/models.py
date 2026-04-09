@@ -356,6 +356,7 @@ class QuoteBlockMember(Base):
     hours_per_unit: Mapped[float | None] = mapped_column(Numeric(10, 4))
     cost_per_unit: Mapped[float | None] = mapped_column(Numeric(12, 4))
     units_per_product: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    margin_rate: Mapped[float | None] = mapped_column(Numeric(5, 4))
     is_active: Mapped[bool | None] = mapped_column(Boolean)
 
     # Computed by engine

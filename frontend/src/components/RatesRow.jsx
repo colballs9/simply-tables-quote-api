@@ -9,24 +9,25 @@ function formatCost(val) {
 }
 
 /**
- * RatesRow — per-block margin rate section.
+ * RatesRow — per-block margin rate section with per-product rate inputs.
  *
- * Shows one row per cost block with its margin rate (editable),
- * plus per-product cost/adjusted/profit display underneath.
- * Summary at bottom with total cost, total adjusted, effective rate.
+ * Each cost block gets a row. Each product column shows an editable margin rate
+ * (member override or block default) plus cost/adjusted/profit.
+ * Summary at bottom with totals and effective rate.
  */
 export default function RatesRow({ products, quote, onQuoteUpdate }) {
   const [expanded, setExpanded] = useState(false)
 
   const costBlocks = (quote?.quote_blocks || []).filter(b => b.block_domain === 'cost')
 
-  // Build per-product totals for summary
+  // Compute per-product totals for summary
   const productTotals = {}
   products.forEach(p => { productTotals[p.id] = { cost: 0, adjusted: 0 } })
 
   costBlocks.forEach(block => {
-    const rate = block.margin_rate ?? 0.05
+    const blockRate = block.margin_rate ?? 0.05
     ;(block.members || []).forEach(m => {
+      const rate = m.margin_rate ?? blockRate
       const costPP = m.cost_pp || 0
       const adjustedPP = costPP * (1 + rate)
       if (productTotals[m.product_id]) {
@@ -36,7 +37,6 @@ export default function RatesRow({ products, quote, onQuoteUpdate }) {
     })
   })
 
-  // Grand totals across all products
   let grandCost = 0
   let grandAdjusted = 0
   products.forEach(p => {
@@ -103,32 +103,7 @@ export default function RatesRow({ products, quote, onQuoteUpdate }) {
 
 
 function MarginBlockRow({ block, products, onQuoteUpdate }) {
-  const rate = block.margin_rate ?? 0.05
-  const [localRate, setLocalRate] = useState(String((rate * 100).toFixed(1)))
-  const focusRef = useRef(null)
-  const ss = useSpreadsheetInput(setLocalRate)
-
-  const prevRef = useRef(rate)
-  if (rate !== prevRef.current && focusRef.current !== 'rate') {
-    setLocalRate(String((rate * 100).toFixed(1)))
-  }
-  prevRef.current = rate
-
-  async function saveRate() {
-    focusRef.current = null
-    const pct = parseFloat(localRate)
-    if (isNaN(pct)) return
-    const decimal = pct / 100
-    if (decimal === rate) return
-    try {
-      const updated = await quoteBlocks.update(block.id, { margin_rate: decimal })
-      onQuoteUpdate(updated)
-    } catch (err) {
-      console.error('Failed to update block margin rate:', err)
-    }
-  }
-
-  // Build member map
+  const blockRate = block.margin_rate ?? 0.05
   const memberMap = {}
   ;(block.members || []).forEach(m => { memberMap[m.product_id] = m })
 
@@ -137,20 +112,7 @@ function MarginBlockRow({ block, products, onQuoteUpdate }) {
       <div className="canvas-cell canvas-cell--label canvas-cell--pricing-label">
         <div className="margin-block-label">
           <span className="margin-block-name">{block.label || block.cost_category}</span>
-          <div className="margin-block-rate-wrap">
-            <input
-              className="margin-rate-input"
-              type="number"
-              step="0.5"
-              value={localRate}
-              onChange={e => setLocalRate(e.target.value)}
-              onFocus={e => { focusRef.current = 'rate'; ss.onFocus(e) }}
-              onBlur={saveRate}
-              onKeyDown={ss.onKeyDown}
-              title="Margin rate %"
-            />
-            <span className="margin-rate-pct">%</span>
-          </div>
+          <span className="margin-block-default">Default: {(blockRate * 100).toFixed(1)}%</span>
         </div>
       </div>
       {products.map(product => {
@@ -162,20 +124,74 @@ function MarginBlockRow({ block, products, onQuoteUpdate }) {
             </div>
           )
         }
-        const costPP = member.cost_pp || 0
-        const adjustedPP = costPP * (1 + rate)
-        const profitPP = adjustedPP - costPP
         return (
-          <div key={product.id} className="canvas-cell canvas-cell--value canvas-cell--pricing-value">
-            <div className="margin-product-detail">
-              <span className="margin-detail-cost">{formatCost(costPP)}</span>
-              <span className="margin-detail-adjusted">{formatCost(adjustedPP)}</span>
-              <span className="margin-detail-profit">+{formatCost(profitPP)}</span>
-            </div>
-          </div>
+          <MarginMemberCell
+            key={product.id}
+            block={block}
+            member={member}
+            product={product}
+            blockRate={blockRate}
+            onQuoteUpdate={onQuoteUpdate}
+          />
         )
       })}
       <div className="canvas-cell canvas-cell--spacer" />
     </>
+  )
+}
+
+
+function MarginMemberCell({ block, member, product, blockRate, onQuoteUpdate }) {
+  const effectiveRate = member.margin_rate ?? blockRate
+  const [localRate, setLocalRate] = useState(String((effectiveRate * 100).toFixed(1)))
+  const focusRef = useRef(null)
+  const ss = useSpreadsheetInput(setLocalRate)
+
+  const prevRef = useRef(effectiveRate)
+  if (effectiveRate !== prevRef.current && focusRef.current !== 'rate') {
+    setLocalRate(String((effectiveRate * 100).toFixed(1)))
+  }
+  prevRef.current = effectiveRate
+
+  async function saveRate() {
+    focusRef.current = null
+    const pct = parseFloat(localRate)
+    if (isNaN(pct)) return
+    const decimal = pct / 100
+    if (decimal === effectiveRate) return
+    try {
+      const updated = await quoteBlocks.updateMember(block.id, product.id, { margin_rate: decimal })
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to update member margin rate:', err)
+    }
+  }
+
+  const costPP = member.cost_pp || 0
+  const adjustedPP = costPP * (1 + effectiveRate)
+  const profitPP = adjustedPP - costPP
+
+  return (
+    <div className="canvas-cell canvas-cell--value canvas-cell--pricing-value">
+      <div className="margin-product-detail">
+        <div className="margin-block-rate-wrap">
+          <input
+            className="margin-rate-input"
+            type="number"
+            step="0.5"
+            value={localRate}
+            onChange={e => setLocalRate(e.target.value)}
+            onFocus={e => { focusRef.current = 'rate'; ss.onFocus(e) }}
+            onBlur={saveRate}
+            onKeyDown={ss.onKeyDown}
+            title="Margin rate %"
+          />
+          <span className="margin-rate-pct">%</span>
+        </div>
+        <span className="margin-detail-cost">{formatCost(costPP)}</span>
+        <span className="margin-detail-adjusted">{formatCost(adjustedPP)}</span>
+        <span className="margin-detail-profit">+{formatCost(profitPP)}</span>
+      </div>
+    </div>
   )
 }

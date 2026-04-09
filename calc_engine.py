@@ -932,12 +932,15 @@ def compute_quote(quote_data: dict) -> dict:
                     members[i]["hours_pt"] = Decimal("0")
                     pid = cm["product_id"]
                     if pid in cost_results_by_product:
+                        # Member margin_rate overrides block default
+                        m_margin = members[i].get("margin_rate")
+                        eff_margin = _d(m_margin if m_margin is not None else block.get("margin_rate", "0.05"))
                         cost_results_by_product[pid].append({
                             "cost_pp": cm["cost_pp"],
                             "cost_pt": cm["cost_pt"],
                             "cost_category": block.get("cost_category", "group_cost"),
                             "tag_id": block.get("tag_id"),
-                            "margin_rate": _d(block.get("margin_rate", "0.05")),
+                            "margin_rate": eff_margin,
                         })
             else:
                 # Unit cost block — compute per member
@@ -951,12 +954,15 @@ def compute_quote(quote_data: dict) -> dict:
                     member["hours_pt"] = Decimal("0")
                     member["metric_value"] = Decimal("0")
                     if pid in cost_results_by_product:
+                        # Member margin_rate overrides block default
+                        m_margin = member.get("margin_rate")
+                        eff_margin = _d(m_margin if m_margin is not None else block.get("margin_rate", "0.05"))
                         cost_results_by_product[pid].append({
                             "cost_pp": result["cost_pp"],
                             "cost_pt": result["cost_pt"],
                             "cost_category": block.get("cost_category", "unit_cost"),
                             "tag_id": block.get("tag_id"),
-                            "margin_rate": _d(block.get("margin_rate", "0.05")),
+                            "margin_rate": eff_margin,
                         })
 
         elif domain == "labor":

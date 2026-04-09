@@ -2876,6 +2876,12 @@ a:hover { color: var(--green-700); }
   text-overflow: ellipsis;
 }
 
+.margin-block-default {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 .margin-block-rate-wrap {
   display: flex;
   align-items: center;
