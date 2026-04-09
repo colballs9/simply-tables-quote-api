@@ -2,7 +2,7 @@
 
 For future chat handoff and safe build workflow, read `BUILD_PLAN.md` first.
 
-**Current state (Apr 7, 2026):**
+**Current state (Apr 9, 2026):**
 - Deployed to Cloud Run service: `simply-tables-quote-api` (`us-central1`)
 - Live service URL: `https://simply-tables-quote-api-442186711676.us-central1.run.app`
 - Backend + frontend are in one container image

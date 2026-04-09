@@ -117,9 +117,9 @@ Core layers are live and actively deployed:
 1. Populate/maintain reference tables (material context, base catalog)
 2. Add regression tests for API + frontend integration paths
 3. Build catalog/settings pages
-4. Wire component bdft into species pipeline (base lumber pricing)
-5. Species assignment UI (set $/bdft per species)
-6. Stone pricing UI (set total cost per stone type)
+4. ~~Wire component bdft into species pipeline~~ ✅ Done
+5. ~~Species assignment UI~~ ✅ SpeciesBlockRow with $/bdft, waste factor, detail breakdown
+6. ~~Stone pricing UI~~ ✅ StoneBlockRow with numbered groups, total cost input
 
 ### Frontend UX Notes (Current)
 
@@ -129,13 +129,21 @@ Core layers are live and actively deployed:
 4. **Combined-field rows** for Length|Width|Height and Base Type|Bases Per Top
 5. **Top Descriptions** with material-type-aware sub-sections (Finishes, Edge, Other) + dynamic detail/exception items
 6. **Base Descriptions** with base-type-aware fields (Stock Base vs Custom Base) + dynamic detail/exception items
-7. Cost blocks organized under Material Costs / Base Costs / Project Costs sections
+7. Cost blocks organized under **Material Costs** (Hardwood / Stone sub-sections) / **Base Costs** / **Project Costs** sections
 8. Labor blocks organized under 12 labor center sections (101 Processing through 111 Packing + Loading)
-9. Built-in blocks (species, stone, rate labor) are auto-created by pipelines — users edit rates, not block structure
-10. Cost block multiplier types: Units (flat), Pieces (per-product count), Per Base. Per Sq Ft / Per Bd Ft are pipeline-only (not in UI dropdowns)
-11. Tags dropdown on all blocks (Top, Base, Shipping, General)
-12. Light neumorphic theme with #49554C green accent
-13. Side panel shows summary, shipping
+9. **Built-in blocks** auto-created by pipelines:
+   - **Species**: `SpeciesBlockRow` — editable $/bdft + waste factor, read-only bdft/cost per product, collapsible detail+tags breakdown (top vs material builder)
+   - **Stone**: `StoneBlockRow` — numbered groups (user assigns stone_group on product), total cost input, calculated $/sqft, read-only sqft/cost per product
+   - **Stock Base**: auto-creates "Stock Base Cost" (unit, per_base, Base tag) + "Stock Base Shipping" (group) when any product has Stock Base
+   - **Rate Labor**: per labor center, rate-based hours
+10. Cost block multiplier types: Units (flat), Pieces (per-product count), Per Base. Per Sq Ft / Per Bd Ft check member.units_per_product override (pipeline-stored)
+11. **Block row layout**: type dropdown (Unit/Group/Rate) on row 1 before description, config on row 2, block total sum display. Product cost note input per member. $ prefix on cost inputs.
+12. **Margin rates** are per-block with per-product (member) overrides. Rates section shows one row per cost block, each product column has editable %, cost/adjusted/profit display, and a summary at bottom
+13. Tags dropdown on all user-created blocks (Top, Base, Shipping, General)
+14. **Material Builder**: L × W × D dimensions + separate lumber thickness/species row for wood types. Component bdft = volume (L×W×D/144), waste applied by species pipeline
+15. Fonts: DM Sans (body), Inter (numbers/inputs). Light neumorphic theme with #49554C green accent
+16. **Section headers**: Cost Blocks = orange bar with white text, Hours Blocks = purple bar with white text
+17. Side panel shows summary, shipping
 
 ---
 
@@ -266,26 +274,18 @@ PT = Product Total (PP × Quantity)
 7. Option and quote totals
 
 ### Key formulas:
-- **Board feet:** `(width × length × raw_thickness / 144) × 1.3` (30% waste factor)
+- **Board feet (product top):** `(width × length × raw_thickness / 144) × WASTE_FACTOR_TOP` (display only, 30% waste)
+- **Board feet (component):** `L × W × D / 144` (raw volume, no waste — species pipeline applies waste)
+- **Species bdft:** raw bdft × (1 + waste_factor), where waste_factor is editable per species assignment (default 25%)
 - **Square feet:** `(width / 12) × (length / 12)` or `π × (diameter/24)²` for DIA
-- **Material price:** sum of (cost_pp × (1 + margin_rate)) per category
+- **Material price:** sum of (cost_pp × (1 + margin_rate)) per block — margin_rate is per-member (overrides block default)
 - **Hours price:** total_hours_pp × hourly_rate
 - **Final price:** (material_price + hours_price) × final_adjustment_rate
 - **Sale price:** final_price × (1 + rep_rate) if has_rep
 
-### Margin rates by category (defaults, adjustable per product):
-| Category | Default | Rationale |
-|----------|---------|-----------|
-| Hardwood | 5% | Profit via labor, not material markup |
-| Stone | 25% | Little labor, profit from markup |
-| Stock Base | 25% | Pure resale |
-| Stock Base Shipping | 5% | Pass-through with buffer |
-| Powder Coat | 10% | Outsourced process |
-| Custom Base | 5% | Built in-house, profit via labor |
-| Unit Costs | 5% | Components, adjustable per item |
-| Group Costs | 5% | Distributed costs |
-| Misc | 0% | Pass-through |
-| Consumables | 0% | Pass-through |
+### Margin rates (per-block, per-product override):
+Each cost block has a `margin_rate` (default varies by type). Each member can override the block default.
+Pipeline defaults: Species 5%, Stone 25%, Stock Base 25%, Stock Base Shipping 5%, user-created 5%.
 
 ---
 
@@ -331,12 +331,14 @@ PT = Product Total (PP × Quantity)
 │   ├── ProductMultiFieldRow.jsx ← Combined fields on one row (Length|Width|Height)
 │   ├── ProductMaterialRow.jsx ← Material search + inline lumber thickness
 │   ├── DescriptionSubSection.jsx ← Collapsible sub-section with detail/exception items
-│   ├── MaterialBuilder.jsx    ← Product component editor (plank, leg, apron, metal)
+│   ├── MaterialBuilder.jsx    ← Product component editor (L×W×D + lumber/species)
 │   ├── MaterialSearch.jsx     ← Autocomplete for material_detail field
-│   ├── BlockRow.jsx           ← Block label cell + per-product member cells
-│   ├── BlockRowCost.jsx       ← Cost block config (type, multiplier, tag)
-│   ├── BlockRowLabor.jsx      ← Labor block config (type, rate, metric, tag)
-│   ├── RatesRow.jsx           ← Collapsible margin rates section
+│   ├── BlockRow.jsx           ← Block label cell + per-product member cells (+ cost note)
+│   ├── BlockRowCost.jsx       ← Cost block config (type before desc, multiplier, tag, total)
+│   ├── BlockRowLabor.jsx      ← Labor block config (type before desc, rate, metric, tag, total)
+│   ├── SpeciesBlockRow.jsx    ← Hardwood species block ($/bdft, waste, detail+tags)
+│   ├── StoneBlockRow.jsx      ← Stone block (numbered groups, total cost, $/sqft)
+│   ├── RatesRow.jsx           ← Per-block margin rates with per-product inputs + summary
 │   ├── PricingRow.jsx         ← Pricing rows (hourly rate, costs, prices, rep)
 │   └── SidePanel.jsx          ← Quote stats + summary + shipping
 │
