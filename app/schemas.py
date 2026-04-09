@@ -175,6 +175,7 @@ class QuoteBlockCreate(BaseModel):
     total_hours: Optional[float] = None
     distribution_type: Optional[str] = None
     on_qty_change: str = "redistribute"
+    margin_rate: Optional[float] = 0.05
     # Initial member product IDs
     product_ids: list[uuid.UUID] = []
 
@@ -201,6 +202,7 @@ class QuoteBlockUpdate(BaseModel):
     total_hours: Optional[float] = None
     distribution_type: Optional[str] = None
     on_qty_change: Optional[str] = None
+    margin_rate: Optional[float] = None
 
 
 class QuoteBlockRead(BaseModel):
@@ -230,6 +232,7 @@ class QuoteBlockRead(BaseModel):
     total_hours: Optional[float] = None
     distribution_type: Optional[str] = None
     on_qty_change: Optional[str] = None
+    margin_rate: Optional[float] = None
     # Members
     members: list[QuoteBlockMemberRead] = []
 

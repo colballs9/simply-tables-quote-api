@@ -646,9 +646,8 @@ class TestProductPricing:
     def test_simple_hardwood_table(self):
         """
         A basic hardwood table:
-        - Species cost: $81.90 PP (23.4 bdft × $3.50/bdft)
-        - Hardwood margin: 5%
-        - Stock base: $255 PP, margin 25%
+        - Species cost: $81.90 PP, block margin 5%
+        - Stock base: $255 PP, block margin 25%
         - 2 hours at $155/hr
         - Qty 2, no rep, no adjustment
         """
@@ -656,12 +655,10 @@ class TestProductPricing:
             "quantity": 2,
             "hourly_rate": 155,
             "final_adjustment_rate": 1,
-            "hardwood_margin_rate": Decimal("0.05"),
-            "stock_base_margin_rate": Decimal("0.25"),
         }
         cost_results = [
-            {"cost_category": "species", "cost_pp": Decimal("81.90")},
-            {"cost_category": "stock_base", "cost_pp": Decimal("255.00")},
+            {"cost_category": "species", "cost_pp": Decimal("81.90"), "margin_rate": Decimal("0.05")},
+            {"cost_category": "stock_base", "cost_pp": Decimal("255.00"), "margin_rate": Decimal("0.25")},
         ]
         labor_results = [
             {"labor_center": "LC101", "hours_pp": Decimal("0.8")},
@@ -673,7 +670,7 @@ class TestProductPricing:
 
         # Species: 81.90 × 1.05 = 85.995
         # Stock base: 255 × 1.25 = 318.75
-        # Material price: 85.995 + 318.75 = 404.745 ≈ 404.75
+        # Total cost: 81.90 + 255.00 = 336.90
         assert result["total_material_cost"] == Decimal("336.90")
 
         # Hours: 2.0 × 155 = 310
@@ -691,10 +688,9 @@ class TestProductPricing:
             "quantity": 1,
             "hourly_rate": 155,
             "final_adjustment_rate": Decimal("1.2"),
-            "unit_cost_margin_rate": Decimal("0.05"),
         }
         cost_results = [
-            {"cost_category": "unit_cost", "cost_pp": Decimal("100.00")},
+            {"cost_category": "unit_cost", "cost_pp": Decimal("100.00"), "margin_rate": Decimal("0.05")},
         ]
         labor_results = [
             {"labor_center": "LC105", "hours_pp": Decimal("1.0")},
@@ -808,7 +804,7 @@ class TestFullQuote:
                 # P1 species cost
                 {
                     "id": "b1", "block_domain": "cost", "block_type": "unit",
-                    "cost_category": "species",
+                    "cost_category": "species", "margin_rate": "0.05",
                     "cost_per_unit": "3.50",
                     "multiplier_type": "per_bdft",
                     "tag_id": "t1",
@@ -817,7 +813,7 @@ class TestFullQuote:
                 # P1 stock base cost
                 {
                     "id": "b2", "block_domain": "cost", "block_type": "unit",
-                    "cost_category": "stock_base",
+                    "cost_category": "stock_base", "margin_rate": "0.25",
                     "cost_per_unit": "255",
                     "multiplier_type": "per_base",
                     "tag_id": "t2",
@@ -826,7 +822,7 @@ class TestFullQuote:
                 # P2 species cost
                 {
                     "id": "b3", "block_domain": "cost", "block_type": "unit",
-                    "cost_category": "species",
+                    "cost_category": "species", "margin_rate": "0.05",
                     "cost_per_unit": "3.50",
                     "multiplier_type": "per_bdft",
                     "tag_id": "t1",
@@ -835,7 +831,7 @@ class TestFullQuote:
                 # P2 stock base cost
                 {
                     "id": "b4", "block_domain": "cost", "block_type": "unit",
-                    "cost_category": "stock_base",
+                    "cost_category": "stock_base", "margin_rate": "0.25",
                     "cost_per_unit": "255",
                     "multiplier_type": "per_base",
                     "tag_id": "t2",
@@ -844,7 +840,7 @@ class TestFullQuote:
                 # Group shipping pool across both products
                 {
                     "id": "b5", "block_domain": "cost", "block_type": "group",
-                    "cost_category": "stock_base_shipping",
+                    "cost_category": "stock_base_shipping", "margin_rate": "0.05",
                     "total_amount": "300",
                     "distribution_type": "units",
                     "on_qty_change": "redistribute",
@@ -1022,88 +1018,88 @@ class TestFarmhouseKitchen0737:
             # Species cost blocks (one per product, all $9.50/bdft)
             {
                 "id": "p1_sp", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "species", "cost_per_unit": "9.50",
+                "cost_category": "species", "margin_rate": "0.10", "cost_per_unit": "9.50",
                 "multiplier_type": "per_bdft", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p1", "id": "p1_sp_m"}],
             },
             {
                 "id": "p2_sp", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "species", "cost_per_unit": "9.50",
+                "cost_category": "species", "margin_rate": "0.10", "cost_per_unit": "9.50",
                 "multiplier_type": "per_bdft", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p2", "id": "p2_sp_m"}],
             },
             {
                 "id": "p3_sp", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "species", "cost_per_unit": "9.50",
+                "cost_category": "species", "margin_rate": "0.10", "cost_per_unit": "9.50",
                 "multiplier_type": "per_bdft", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p3", "id": "p3_sp_m"}],
             },
             {
                 "id": "p4_sp", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "species", "cost_per_unit": "9.50",
+                "cost_category": "species", "margin_rate": "0.10", "cost_per_unit": "9.50",
                 "multiplier_type": "per_bdft", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p4", "id": "p4_sp_m"}],
             },
             {
                 "id": "p5_sp", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "species", "cost_per_unit": "9.50",
+                "cost_category": "species", "margin_rate": "0.10", "cost_per_unit": "9.50",
                 "multiplier_type": "per_bdft", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p5", "id": "p5_sp_m"}],
             },
             {
                 "id": "p6_sp", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "species", "cost_per_unit": "9.50",
+                "cost_category": "species", "margin_rate": "0.10", "cost_per_unit": "9.50",
                 "multiplier_type": "per_bdft", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p6", "id": "p6_sp_m"}],
             },
             # Stock base blocks (Tables 1-5)
             {
                 "id": "p1_sb", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "stock_base", "cost_per_unit": 75,
+                "cost_category": "stock_base", "margin_rate": "0.25", "cost_per_unit": 75,
                 "multiplier_type": "per_base", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p1", "id": "p1_sb_m"}],
             },
             {
                 "id": "p2_sb", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "stock_base", "cost_per_unit": 160,
+                "cost_category": "stock_base", "margin_rate": "0.25", "cost_per_unit": 160,
                 "multiplier_type": "per_base", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p2", "id": "p2_sb_m"}],
             },
             {
                 "id": "p3_sb", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "stock_base", "cost_per_unit": 45,
+                "cost_category": "stock_base", "margin_rate": "0.25", "cost_per_unit": 45,
                 "multiplier_type": "per_base", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p3", "id": "p3_sb_m"}],
             },
             {
                 "id": "p4_sb", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "stock_base", "cost_per_unit": 35,
+                "cost_category": "stock_base", "margin_rate": "0.25", "cost_per_unit": 35,
                 "multiplier_type": "per_base", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p4", "id": "p4_sb_m"}],
             },
             {
                 "id": "p5_sb", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "stock_base", "cost_per_unit": 40,
+                "cost_category": "stock_base", "margin_rate": "0.25", "cost_per_unit": 40,
                 "multiplier_type": "per_base", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p5", "id": "p5_sb_m"}],
             },
             # Table 6: custom base unit costs
             {
                 "id": "p6_uc1", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "unit_cost", "cost_per_unit": 200,
+                "cost_category": "unit_cost", "margin_rate": "0.10", "cost_per_unit": 200,
                 "multiplier_type": "fixed", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p6", "id": "p6_uc1_m"}],
             },
             {
                 "id": "p6_uc2", "block_domain": "cost", "block_type": "unit",
-                "cost_category": "unit_cost", "cost_per_unit": 50,
+                "cost_category": "unit_cost", "margin_rate": "0.10", "cost_per_unit": 50,
                 "multiplier_type": "fixed", "units_per_product": 1, "tag_id": None,
                 "members": [{"product_id": "p6", "id": "p6_uc2_m"}],
             },
             # SB Shipping: $25 by units, Tables 1-5 only (not Table 6)
             {
                 "id": "gp_ship", "block_domain": "cost", "block_type": "group",
-                "cost_category": "stock_base_shipping",
+                "cost_category": "stock_base_shipping", "margin_rate": "0.05",
                 "total_amount": 25,
                 "distribution_type": "units",
                 "on_qty_change": "redistribute", "tag_id": None,
@@ -1118,7 +1114,7 @@ class TestFarmhouseKitchen0737:
             # Misc: $500 by sqft, all 6 tables
             {
                 "id": "gp_misc", "block_domain": "cost", "block_type": "group",
-                "cost_category": "misc",
+                "cost_category": "misc", "margin_rate": "0.00",
                 "total_amount": 500,
                 "distribution_type": "sqft",
                 "on_qty_change": "redistribute", "tag_id": None,
@@ -1134,7 +1130,7 @@ class TestFarmhouseKitchen0737:
             # Consumables: $300 by sqft, all 6 tables
             {
                 "id": "gp_cons", "block_domain": "cost", "block_type": "group",
-                "cost_category": "consumables",
+                "cost_category": "consumables", "margin_rate": "0.00",
                 "total_amount": 300,
                 "distribution_type": "sqft",
                 "on_qty_change": "redistribute", "tag_id": None,
@@ -1804,7 +1800,7 @@ class TestStonePipeline:
                 # Built-in stone block for p1: $cost/sqft via per_sqft
                 {
                     "id": "b1", "block_domain": "cost", "block_type": "unit",
-                    "cost_category": "stone",
+                    "cost_category": "stone", "margin_rate": "0.25",
                     "cost_per_unit": total_cost_per_sqft,
                     "multiplier_type": "per_sqft",
                     "units_per_product": 1, "is_builtin": True,
@@ -1813,7 +1809,7 @@ class TestStonePipeline:
                 # Built-in stone block for p2
                 {
                     "id": "b2", "block_domain": "cost", "block_type": "unit",
-                    "cost_category": "stone",
+                    "cost_category": "stone", "margin_rate": "0.25",
                     "cost_per_unit": total_cost_per_sqft,
                     "multiplier_type": "per_sqft",
                     "units_per_product": 1, "is_builtin": True,

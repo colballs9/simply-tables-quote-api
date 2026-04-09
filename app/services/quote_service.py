@@ -168,6 +168,7 @@ def quote_to_engine_format(quote: Quote, tags: dict[str, str]) -> dict:
             "total_hours": block.total_hours,
             "distribution_type": block.distribution_type,
             "on_qty_change": block.on_qty_change,
+            "margin_rate": block.margin_rate,
             # Members
             "members": members_data,
         })
@@ -471,6 +472,7 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
                 cost_per_unit=None,  # member-level override used instead
                 units_per_product=1,
                 multiplier_type="per_unit",
+                margin_rate=0.05,
             )
             db.add(block)
             quote.quote_blocks.append(block)
@@ -737,6 +739,7 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
                 cost_per_unit=float(rate) if rate else None,
                 units_per_product=1,
                 multiplier_type="per_sqft",
+                margin_rate=0.25,
             )
             db.add(block)
             quote.quote_blocks.append(block)

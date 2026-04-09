@@ -628,22 +628,16 @@ def compute_product_pricing(
     has_rep = quote.get("has_rep", True)
     rep_rate = _d(quote.get("rep_rate", "0.08"))
 
-    # ── Step 1: Aggregate costs by category ──
-    category_costs: dict[str, Decimal] = {}
-
-    for item in cost_results:
-        cat = item.get("cost_category", "other")
-        category_costs[cat] = category_costs.get(cat, Decimal("0")) + _d(item.get("cost_pp", 0))
-
-    # ── Step 2: Apply margins per category ──
+    # ── Step 1 + 2: Apply per-block margin rates ──
+    # Each cost_result carries its own margin_rate from the block.
     total_cost_pp = Decimal("0")
     total_margin_pp = Decimal("0")
     total_material_price_pp = Decimal("0")
     margin_detail = {}
 
-    for cat, cost_pp in category_costs.items():
-        margin_field = MARGIN_CATEGORY_MAP.get(cat, "unit_cost_margin_rate")
-        margin_rate = _d(product.get(margin_field, "0.05"))
+    for item in cost_results:
+        cost_pp = _d(item.get("cost_pp", 0))
+        margin_rate = _d(item.get("margin_rate", "0.05"))
 
         cost_with_margin = _round4(cost_pp * (Decimal("1") + margin_rate))
         margin_dollars = cost_with_margin - cost_pp
@@ -652,12 +646,18 @@ def compute_product_pricing(
         total_margin_pp += margin_dollars
         total_material_price_pp += cost_with_margin
 
-        margin_detail[cat] = {
-            "cost_pp": cost_pp,
-            "margin_rate": margin_rate,
-            "margin_pp": margin_dollars,
-            "price_pp": cost_with_margin,
-        }
+        # Aggregate into margin_detail by category (for summary/display)
+        cat = item.get("cost_category", "other")
+        if cat not in margin_detail:
+            margin_detail[cat] = {
+                "cost_pp": Decimal("0"),
+                "margin_rate": margin_rate,
+                "margin_pp": Decimal("0"),
+                "price_pp": Decimal("0"),
+            }
+        margin_detail[cat]["cost_pp"] += cost_pp
+        margin_detail[cat]["margin_pp"] += margin_dollars
+        margin_detail[cat]["price_pp"] += cost_with_margin
 
     # ── Step 3: Aggregate hours ──
     total_hours_pp = Decimal("0")
@@ -937,6 +937,7 @@ def compute_quote(quote_data: dict) -> dict:
                             "cost_pt": cm["cost_pt"],
                             "cost_category": block.get("cost_category", "group_cost"),
                             "tag_id": block.get("tag_id"),
+                            "margin_rate": _d(block.get("margin_rate", "0.05")),
                         })
             else:
                 # Unit cost block — compute per member
@@ -955,6 +956,7 @@ def compute_quote(quote_data: dict) -> dict:
                             "cost_pt": result["cost_pt"],
                             "cost_category": block.get("cost_category", "unit_cost"),
                             "tag_id": block.get("tag_id"),
+                            "margin_rate": _d(block.get("margin_rate", "0.05")),
                         })
 
         elif domain == "labor":

@@ -476,7 +476,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
         })}
 
         {/* Rates section (collapsible) */}
-        <RatesRow products={sortedProducts} activeOption={activeOption} onQuoteUpdate={onQuoteUpdate} />
+        <RatesRow products={sortedProducts} quote={quote} onQuoteUpdate={onQuoteUpdate} />
 
         {/* Pricing section */}
         <div className="canvas-section-header canvas-section-header--pricing" style={{ gridColumn: '1 / -1' }}>

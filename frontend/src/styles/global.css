@@ -2859,6 +2859,115 @@ a:hover { color: var(--green-700); }
   border-color: var(--accent);
 }
 
+/* ── Per-Block Margin Rates ── */
+
+.margin-block-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.margin-block-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.margin-block-rate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.margin-rate-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  width: 48px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.margin-rate-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.margin-rate-pct {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.margin-product-detail,
+.margin-product-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.margin-detail-cost {
+  color: var(--text-secondary);
+}
+
+.margin-detail-adjusted {
+  color: var(--cost-text);
+  font-weight: 600;
+}
+
+.margin-detail-profit {
+  color: var(--accent);
+  font-size: 0.62rem;
+}
+
+/* Margin Summary */
+
+.margin-summary-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.margin-summary-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.margin-summary-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.margin-summary-line {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.margin-summary-line--adjusted {
+  color: var(--cost-text);
+  font-weight: 600;
+}
+
+.margin-summary-line--rate {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ── Margin Rate Editor (Side Panel) ── */
 
 .sp-margin-grid {

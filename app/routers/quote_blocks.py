@@ -54,6 +54,7 @@ async def create_block(
         total_hours=data.total_hours,
         distribution_type=data.distribution_type,
         on_qty_change=data.on_qty_change,
+        margin_rate=data.margin_rate,
     )
     db.add(block)
     await db.flush()

@@ -329,6 +329,7 @@ class QuoteBlock(Base):
     total_hours: Mapped[float | None] = mapped_column(Numeric(10, 4))
     distribution_type: Mapped[str | None] = mapped_column(String)
     on_qty_change: Mapped[str | None] = mapped_column(String, default="redistribute")
+    margin_rate: Mapped[float | None] = mapped_column(Numeric(5, 4), default=0.05)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
