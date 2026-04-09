@@ -786,6 +786,118 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
     await db.flush()
 
 
+async def manage_stock_base_pipeline(db: AsyncSession, quote: Quote) -> None:
+    """
+    Auto-create two built-in blocks when any product has base_type = 'Stock Base':
+      1. 'Stock Base Cost' — unit, per_base, cost_category='stock_base', tag=Base
+      2. 'Stock Base Shipping' — group, cost_category='stock_base_shipping'
+    Removes both if no stock base products remain.
+    """
+    from sqlalchemy import select as sa_select
+
+    # Find stock base products
+    stock_base_pids = []
+    for option in quote.options:
+        for product in option.products:
+            if product.base_type == "Stock Base":
+                stock_base_pids.append(str(product.id))
+
+    # Look up or create "Base" tag
+    base_tag_id = None
+    result = await db.execute(sa_select(Tag).where(Tag.name == "Base"))
+    tag = result.scalar_one_or_none()
+    if tag:
+        base_tag_id = tag.id
+    elif stock_base_pids:
+        tag = Tag(name="Base", category="base", is_default=True, sort_order=0)
+        db.add(tag)
+        await db.flush()
+        base_tag_id = tag.id
+
+    # Find existing built-in stock base blocks
+    BLOCK_DEFS = [
+        {
+            "label": "Stock Base Cost",
+            "cost_category": "stock_base",
+            "block_type": "unit",
+            "multiplier_type": "per_base",
+            "margin_rate": 0.25,
+            "tag_id": base_tag_id,
+        },
+        {
+            "label": "Stock Base Shipping",
+            "cost_category": "stock_base_shipping",
+            "block_type": "group",
+            "distribution_type": "units",
+            "margin_rate": 0.05,
+            "tag_id": None,
+        },
+    ]
+
+    existing_blocks: dict[str, QuoteBlock] = {
+        b.label: b
+        for b in quote.quote_blocks
+        if b.is_builtin and b.cost_category in ("stock_base", "stock_base_shipping")
+    }
+
+    if not stock_base_pids:
+        # Remove all stock base built-in blocks
+        for block in existing_blocks.values():
+            await db.delete(block)
+            if block in quote.quote_blocks:
+                quote.quote_blocks.remove(block)
+        await db.flush()
+        return
+
+    for bdef in BLOCK_DEFS:
+        label = bdef["label"]
+        if label in existing_blocks:
+            block = existing_blocks.pop(label)
+            # Update tag on existing block if not set
+            if bdef["tag_id"] and not block.tag_id:
+                block.tag_id = bdef["tag_id"]
+        else:
+            block = QuoteBlock(
+                quote_id=quote.id,
+                sort_order=0,
+                is_builtin=True,
+                is_active=True,
+                block_domain="cost",
+                block_type=bdef["block_type"],
+                label=label,
+                cost_category=bdef["cost_category"],
+                multiplier_type=bdef.get("multiplier_type", "per_unit"),
+                distribution_type=bdef.get("distribution_type"),
+                margin_rate=bdef["margin_rate"],
+                tag_id=bdef.get("tag_id"),
+            )
+            db.add(block)
+            quote.quote_blocks.append(block)
+
+        await db.flush()
+
+        # Sync members
+        is_new = label not in {b.label for b in quote.quote_blocks if b.is_builtin and b.id != block.id}
+        existing_members = {str(m.product_id): m for m in block.members} if block.members else {}
+
+        needed = set(stock_base_pids)
+        for pid in needed:
+            if pid not in existing_members:
+                db.add(QuoteBlockMember(quote_block_id=block.id, product_id=pid))
+
+        for pid, m in existing_members.items():
+            if pid not in needed:
+                await db.delete(m)
+
+    # Remove stale blocks
+    for stale in existing_blocks.values():
+        await db.delete(stale)
+        if stale in quote.quote_blocks:
+            quote.quote_blocks.remove(stale)
+
+    await db.flush()
+
+
 async def recalculate_quote(db: AsyncSession, quote_id: uuid.UUID) -> Quote | None:
     """
     The main entry point called after any input change.
@@ -800,6 +912,9 @@ async def recalculate_quote(db: AsyncSession, quote_id: uuid.UUID) -> Quote | No
 
     # Stone pipeline: upsert stone_assignments + built-in stone cost blocks
     await manage_stone_pipeline(db, quote)
+
+    # Stock base pipeline: auto-create stock base cost + shipping blocks
+    await manage_stock_base_pipeline(db, quote)
 
     # Rate labor pipeline: ensure built-in rate labor blocks exist
     await manage_rate_labor_pipeline(db, quote)
