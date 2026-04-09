@@ -64,9 +64,9 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate, avai
       <div className={`canvas-cell canvas-cell--label canvas-cell--block ${isCost ? 'canvas-cell--cost' : 'canvas-cell--labor'}`}>
         <div className="canvas-block-label-content">
           {isCost ? (
-            <BlockRowCost block={block} onBlockUpdate={handleBlockUpdate} availableTags={availableTags} />
+            <BlockRowCost block={block} products={products} onBlockUpdate={handleBlockUpdate} availableTags={availableTags} />
           ) : (
-            <BlockRowLabor block={block} onBlockUpdate={handleBlockUpdate} availableTags={availableTags} />
+            <BlockRowLabor block={block} products={products} onBlockUpdate={handleBlockUpdate} availableTags={availableTags} />
           )}
           {!block.is_builtin && (
             <button className="canvas-block-delete" onClick={handleDeleteBlock} title="Delete block">
@@ -97,6 +97,9 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate, avai
                 />
               ) : (
                 <div className="canvas-member-value" title="Click to remove from block">
+                  {block.block_type !== 'rate' && (
+                    <MemberNoteInput block={block} member={member} product={product} onQuoteUpdate={onQuoteUpdate} />
+                  )}
                   <div className="canvas-member-value-stack">
                     <span
                       className={`canvas-computed ${isCost ? 'canvas-computed--cost' : 'canvas-computed--hours'}`}
@@ -135,6 +138,42 @@ export default function BlockRow({ block, products, quoteId, onQuoteUpdate, avai
       {/* Spacer */}
       <div className="canvas-cell canvas-cell--spacer" />
     </>
+  )
+}
+
+
+function MemberNoteInput({ block, member, product, onQuoteUpdate }) {
+  const [localNote, setLocalNote] = useState(member.description || '')
+  const focusRef = useRef(null)
+  const ss = useSpreadsheetInput(setLocalNote)
+
+  const prevNoteRef = useRef(member.description)
+  if (member.description !== prevNoteRef.current && focusRef.current !== 'note') {
+    setLocalNote(member.description || '')
+  }
+  prevNoteRef.current = member.description
+
+  async function saveNote() {
+    focusRef.current = null
+    if (localNote === (member.description || '')) return
+    try {
+      const updated = await quoteBlocks.updateMember(block.id, product.id, { description: localNote || null })
+      onQuoteUpdate(updated)
+    } catch (err) {
+      console.error('Failed to update member note:', err)
+    }
+  }
+
+  return (
+    <input
+      className="canvas-member-note-input"
+      value={localNote}
+      onChange={e => setLocalNote(e.target.value)}
+      onFocus={e => { focusRef.current = 'note'; ss.onFocus(e) }}
+      onBlur={saveNote}
+      onKeyDown={ss.onKeyDown}
+      placeholder="Product Cost Note"
+    />
   )
 }
 
@@ -198,18 +237,8 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
 
   return (
     <div className="canvas-unit-cell">
+      <MemberNoteInput block={block} member={member} product={product} onQuoteUpdate={onQuoteUpdate} />
       <div className="canvas-unit-inputs">
-        <input
-          className={`canvas-unit-input ${isCost ? 'canvas-unit-input--cost' : 'canvas-unit-input--hours'}`}
-          type="number"
-          step={isCost ? '0.01' : '0.01'}
-          value={localVal}
-          onChange={e => setLocalVal(e.target.value)}
-          onFocus={e => { focusRef.current = 'value'; ss.onFocus(e) }}
-          onBlur={saveValue}
-          onKeyDown={ss.onKeyDown}
-          title={isCost ? (isPieces ? 'Cost per piece' : 'Cost per unit') : 'Hours per unit'}
-        />
         {isPieces && (
           <input
             className="canvas-unit-input canvas-unit-input--pieces"
@@ -224,6 +253,20 @@ function UnitMemberCell({ block, member, product, isCost, onQuoteUpdate }) {
             placeholder="pcs"
           />
         )}
+        <div className="canvas-unit-dollar-wrap">
+          {isCost && <span className="canvas-unit-dollar-prefix">$</span>}
+          <input
+            className={`canvas-unit-input ${isCost ? 'canvas-unit-input--cost' : 'canvas-unit-input--hours'}`}
+            type="number"
+            step={isCost ? '0.01' : '0.01'}
+            value={localVal}
+            onChange={e => setLocalVal(e.target.value)}
+            onFocus={e => { focusRef.current = 'value'; ss.onFocus(e) }}
+            onBlur={saveValue}
+            onKeyDown={ss.onKeyDown}
+            title={isCost ? (isPieces ? 'Cost per piece' : 'Cost per unit') : 'Hours per unit'}
+          />
+        </div>
       </div>
       <span className={`canvas-unit-pp ${isCost ? 'canvas-unit-pp--cost' : 'canvas-unit-pp--hours'}`}>
         {isCost ? formatCost(computedPP) : formatHours(computedPP)}

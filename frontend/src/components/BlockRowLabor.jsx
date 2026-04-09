@@ -2,9 +2,9 @@ import { useState, useRef, useCallback } from 'react'
 import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
 const BLOCK_TYPES = [
-  { value: 'unit', label: 'Unit Hours' },
-  { value: 'group', label: 'Group Hours' },
-  { value: 'rate', label: 'Rate Hours' },
+  { value: 'unit', label: 'Unit' },
+  { value: 'group', label: 'Group' },
+  { value: 'rate', label: 'Rate' },
 ]
 
 const METRIC_SOURCES = [
@@ -20,7 +20,7 @@ const DIST_OPTIONS = [
   { value: 'sqft', label: 'By Sq Ft' },
 ]
 
-export default function BlockRowLabor({ block, onBlockUpdate, availableTags }) {
+export default function BlockRowLabor({ block, products, onBlockUpdate, availableTags }) {
   const [label, setLabel] = useState(block.label || '')
   const [hoursPerUnit, setHoursPerUnit] = useState(String(block.hours_per_unit ?? ''))
   const [rateValue, setRateValue] = useState(String(block.rate_value ?? ''))
@@ -93,20 +93,17 @@ export default function BlockRowLabor({ block, onBlockUpdate, availableTags }) {
     }
   }
 
+  // Compute block total hours across all members
+  const blockTotalHours = (block.members || []).reduce((sum, m) => {
+    const pt = m.hours_pp != null ? Number(m.hours_pp) * (products.find(p => p.id === m.product_id)?.quantity || 1) : 0
+    return sum + pt
+  }, 0)
+
   return (
     <div className="canvas-block-fields">
-      <input
-        className="canvas-block-label-input"
-        value={label}
-        onChange={e => setLabel(e.target.value)}
-        onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
-        onBlur={saveLabel}
-        onKeyDown={ssLabel.onKeyDown}
-        placeholder="Label..."
-      />
       <div className="canvas-block-fields-row">
         <select
-          className="canvas-block-select"
+          className="canvas-block-select canvas-block-type-select"
           value={block.block_type || 'unit'}
           onChange={e => onBlockUpdate({ block_type: e.target.value })}
         >
@@ -114,31 +111,27 @@ export default function BlockRowLabor({ block, onBlockUpdate, availableTags }) {
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
-
+        <input
+          className="canvas-block-label-input"
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
+          onBlur={saveLabel}
+          onKeyDown={ssLabel.onKeyDown}
+          placeholder="Description..."
+        />
+      </div>
+      <div className="canvas-block-fields-row">
         {isGroup ? (
-          <>
-            <input
-              className="canvas-block-num-input"
-              type="number"
-              step="0.25"
-              value={totalHours}
-              onChange={e => setTotalHours(e.target.value)}
-              onFocus={e => { focusRef.current = 'totalHours'; ssTotalHours.onFocus(e) }}
-              onBlur={saveTotalHours}
-              onKeyDown={ssTotalHours.onKeyDown}
-              placeholder="Total hrs"
-              title="Total hours"
-            />
-            <select
-              className="canvas-block-select"
-              value={block.distribution_type || 'units'}
-              onChange={e => onBlockUpdate({ distribution_type: e.target.value })}
-            >
-              {DIST_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </>
+          <select
+            className="canvas-block-select"
+            value={block.distribution_type || 'units'}
+            onChange={e => onBlockUpdate({ distribution_type: e.target.value })}
+          >
+            {DIST_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         ) : isRate ? (
           <>
             <input
@@ -164,18 +157,8 @@ export default function BlockRowLabor({ block, onBlockUpdate, availableTags }) {
             </select>
           </>
         ) : (
-          <input
-            className="canvas-block-num-input"
-            type="number"
-            step="0.01"
-            value={hoursPerUnit}
-            onChange={e => setHoursPerUnit(e.target.value)}
-            onFocus={e => { focusRef.current = 'hoursPerUnit'; ssHoursPerUnit.onFocus(e) }}
-            onBlur={saveHoursPerUnit}
-            onKeyDown={ssHoursPerUnit.onKeyDown}
-            placeholder="hrs/unit"
-            title="Hours per unit"
-          />
+          /* Unit labor — no extra config needed on row 2 besides tag */
+          null
         )}
 
         <select
@@ -188,6 +171,24 @@ export default function BlockRowLabor({ block, onBlockUpdate, availableTags }) {
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
+
+        {isGroup && (
+          <input
+            className="canvas-block-num-input"
+            type="number"
+            step="0.25"
+            value={totalHours}
+            onChange={e => setTotalHours(e.target.value)}
+            onFocus={e => { focusRef.current = 'totalHours'; ssTotalHours.onFocus(e) }}
+            onBlur={saveTotalHours}
+            onKeyDown={ssTotalHours.onKeyDown}
+            placeholder="Total hrs"
+            title="Total hours"
+          />
+        )}
+      </div>
+      <div className="canvas-block-total-sum canvas-block-total-sum--hours">
+        {blockTotalHours.toFixed(2) + 'h'}
       </div>
     </div>
   )

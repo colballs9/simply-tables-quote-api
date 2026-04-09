@@ -2,8 +2,8 @@ import { useState, useRef, useCallback } from 'react'
 import useSpreadsheetInput from '../hooks/useSpreadsheetInput'
 
 const BLOCK_TYPES = [
-  { value: 'unit', label: 'Unit Cost' },
-  { value: 'group', label: 'Group Cost' },
+  { value: 'unit', label: 'Unit' },
+  { value: 'group', label: 'Group' },
 ]
 
 const MULTIPLIER_TYPES = [
@@ -17,7 +17,7 @@ const DIST_OPTIONS = [
   { value: 'sqft', label: 'By Sq Ft' },
 ]
 
-export default function BlockRowCost({ block, onBlockUpdate, availableTags }) {
+export default function BlockRowCost({ block, products, onBlockUpdate, availableTags }) {
   // Local draft state — only overwritten from props when NOT focused
   const [label, setLabel] = useState(block.label || '')
   const [totalAmount, setTotalAmount] = useState(String(block.total_amount ?? ''))
@@ -63,20 +63,17 @@ export default function BlockRowCost({ block, onBlockUpdate, availableTags }) {
     }
   }
 
+  // Compute block total across all members
+  const blockTotal = (block.members || []).reduce((sum, m) => {
+    const pt = m.cost_pp != null && m.cost_pp !== undefined ? Number(m.cost_pp) * (products.find(p => p.id === m.product_id)?.quantity || 1) : 0
+    return sum + pt
+  }, 0)
+
   return (
     <div className="canvas-block-fields">
-      <input
-        className="canvas-block-label-input"
-        value={label}
-        onChange={e => setLabel(e.target.value)}
-        onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
-        onBlur={saveLabel}
-        onKeyDown={ssLabel.onKeyDown}
-        placeholder="Label..."
-      />
       <div className="canvas-block-fields-row">
         <select
-          className="canvas-block-select"
+          className="canvas-block-select canvas-block-type-select"
           value={block.block_type || 'unit'}
           onChange={e => onBlockUpdate({ block_type: e.target.value })}
         >
@@ -84,21 +81,19 @@ export default function BlockRowCost({ block, onBlockUpdate, availableTags }) {
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
-
+        <input
+          className="canvas-block-label-input"
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          onFocus={e => { focusRef.current = 'label'; ssLabel.onFocus(e) }}
+          onBlur={saveLabel}
+          onKeyDown={ssLabel.onKeyDown}
+          placeholder="Description..."
+        />
+      </div>
+      <div className="canvas-block-fields-row">
         {isGroup ? (
           <>
-            <input
-              className="canvas-block-num-input"
-              type="number"
-              step="1"
-              value={totalAmount}
-              onChange={e => setTotalAmount(e.target.value)}
-              onFocus={e => { focusRef.current = 'totalAmount'; ssTotalAmount.onFocus(e) }}
-              onBlur={saveTotalAmount}
-              onKeyDown={ssTotalAmount.onKeyDown}
-              placeholder="Total $"
-              title="Total amount"
-            />
             <select
               className="canvas-block-select"
               value={block.distribution_type || 'units'}
@@ -131,6 +126,27 @@ export default function BlockRowCost({ block, onBlockUpdate, availableTags }) {
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
+
+        {isGroup && (
+          <div className="canvas-block-total-input-wrap">
+            <span className="canvas-block-dollar-prefix">$</span>
+            <input
+              className="canvas-block-num-input canvas-block-total-amount-input"
+              type="number"
+              step="1"
+              value={totalAmount}
+              onChange={e => setTotalAmount(e.target.value)}
+              onFocus={e => { focusRef.current = 'totalAmount'; ssTotalAmount.onFocus(e) }}
+              onBlur={saveTotalAmount}
+              onKeyDown={ssTotalAmount.onKeyDown}
+              placeholder="Total"
+              title="Total amount"
+            />
+          </div>
+        )}
+      </div>
+      <div className="canvas-block-total-sum">
+        {'$' + blockTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
     </div>
   )
