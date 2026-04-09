@@ -572,6 +572,7 @@ class QuoteRead(BaseModel):
     updated_at: datetime
     options: list[QuoteOptionRead] = []
     quote_blocks: list[QuoteBlockRead] = []
+    species_assignments: list[SpeciesAssignmentRead] = []
     stone_assignments: list[StoneAssignmentRead] = []
 
 

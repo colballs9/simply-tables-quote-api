@@ -104,6 +104,13 @@ export const tags = {
   create: (data) => request('/tags', { method: 'POST', body: data }),
 };
 
+// ── Species ──
+
+export const species = {
+  list: (quoteId) => request(`/quotes/${quoteId}/species`),
+  updatePrice: (quoteId, speciesKey, data) => request(`/quotes/${quoteId}/species/${encodeURIComponent(speciesKey)}`, { method: 'PATCH', body: data }),
+};
+
 // ── Catalog & Context ──
 
 export const catalog = {

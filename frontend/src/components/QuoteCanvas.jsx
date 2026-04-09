@@ -10,6 +10,7 @@ import ProductMaterialRow from './ProductMaterialRow'
 import MaterialBuilder from './MaterialBuilder'
 import DescriptionSubSection from './DescriptionSubSection'
 import BlockRow from './BlockRow'
+import SpeciesBlockRow from './SpeciesBlockRow'
 import RatesRow from './RatesRow'
 import PricingRow from './PricingRow'
 
@@ -127,6 +128,13 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
   const optionId = activeOption?.id
 
   const allBlocks = quote?.quote_blocks || []
+  const speciesAssignmentMap = useMemo(() => {
+    const map = {}
+    ;(quote?.species_assignments || []).forEach(sa => {
+      map[sa.species_key] = sa
+    })
+    return map
+  }, [quote?.species_assignments])
 
   const costBlocksBySection = useMemo(() => {
     const costBlocks = allBlocks.filter(b => b.block_domain === 'cost')
@@ -373,14 +381,25 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
               </div>
 
               {blocks.map(block => (
-                <BlockRow
-                  key={block.id}
-                  block={block}
-                  products={sortedProducts}
-                  quoteId={quote.id}
-                  onQuoteUpdate={onQuoteUpdate}
-                  availableTags={availableTags}
-                />
+                block.is_builtin && block.cost_category === 'species' ? (
+                  <SpeciesBlockRow
+                    key={block.id}
+                    block={block}
+                    products={sortedProducts}
+                    quoteId={quote.id}
+                    speciesAssignment={speciesAssignmentMap[block.label]}
+                    onQuoteUpdate={onQuoteUpdate}
+                  />
+                ) : (
+                  <BlockRow
+                    key={block.id}
+                    block={block}
+                    products={sortedProducts}
+                    quoteId={quote.id}
+                    onQuoteUpdate={onQuoteUpdate}
+                    availableTags={availableTags}
+                  />
+                )
               ))}
             </div>
           )

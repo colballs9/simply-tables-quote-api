@@ -474,11 +474,13 @@ async def manage_species_pipeline(db: AsyncSession, quote: Quote) -> None:
                 if pid in existing_members:
                     m = existing_members.pop(pid)
                     m.cost_per_unit = member_cost
+                    m.units_per_product = float(bd_ft)
                 else:
                     m = QuoteBlockMember(
                         quote_block_id=block.id,
                         product_id=product.id,
                         cost_per_unit=member_cost,
+                        units_per_product=float(bd_ft),
                     )
                     db.add(m)
                     # Don't append to block.members — triggers lazy load in async.
