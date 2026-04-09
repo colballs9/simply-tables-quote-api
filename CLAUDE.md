@@ -43,7 +43,7 @@ These rules exist because we've hit these bugs multiple times. Every new compone
 
 4. **Sync from props only when identity changes or field is NOT focused.** Use a `prevIdRef` to detect when the parent object (product, block) changes identity. Use the focusRef to skip syncing focused fields. Never use `useEffect` with prop values as deps for input sync — it fires too often and causes flicker.
 
-5. **Product column inputs** use `PcolText`, `PcolNum`, `PcolSelect` sub-components in `ProductColumn.jsx`. Follow their pattern for any new product fields.
+5. **Product field inputs** use the `ProductFieldCell` / `ProductFieldRow` pattern for single-field rows and `ProductMultiFieldRow` for combined rows (e.g. Length | Width | Height). For specialized rows, see `ProductMaterialRow` (inline lumber select) and `ProductTitleRow` (title + tag/location). Copy these patterns for new product fields.
 
 ### Frontend Mutation Rules
 
@@ -53,7 +53,7 @@ These rules exist because we've hit these bugs multiple times. Every new compone
 
 ### Backend Async Rules
 
-8. **NEVER access an ORM relationship on an object fetched with bare `db.get()`.** It triggers a synchronous lazy load which crashes with `MissingGreenlet` in async SQLAlchemy + asyncpg. Always use `selectinload()` in the query, or query the child table directly.
+8. **NEVER access an ORM relationship on an object fetched with bare `db.get()`.** It triggers a synchronous lazy load which crashes with `MissingGreenlet` in async SQLAlchemy + asyncpg. Always use `selectinload()` in the query, or query the child table directly. **When a model has multiple child relationships** (e.g. Product has both `components` and `description_items`), each must be a separate `selectinload` chain from the root — you cannot chain two siblings off one path.
 
 9. **After pipelines create new blocks/members, ALWAYS flush and reload** the full quote via `load_full_quote()` before passing to the calc engine. New blocks appended to `quote.quote_blocks` don't have their `members` relationship eagerly loaded — iterating them crashes.
 
@@ -80,7 +80,7 @@ These rules exist because we've hit these bugs multiple times. Every new compone
     - Does it create an ORM object then access its relationships? → Flush + reload or query directly
     - Does it iterate a collection that might not be eagerly loaded? → Verify the load path
 
-18. **Copy patterns from existing battle-tested components, don't write from scratch.** When creating a new input, copy from `PcolText`/`PcolNum`. New block cell? Copy from `UnitMemberCell`. New pricing row? Copy from `HourlyRateCell`. These patterns have been debugged through multiple iterations — starting from them prevents reinventing the same bugs.
+18. **Copy patterns from existing battle-tested components, don't write from scratch.** When creating a new product field, copy from `ProductFieldCell`. New block cell? Copy from `UnitMemberCell`. New pricing row? Copy from `EditableProductLine` in `PricingRow.jsx`. Combined fields? Copy `ProductMultiFieldRow`. Description sub-section? Copy `DescriptionSubSection`. These patterns have been debugged through multiple iterations — starting from them prevents reinventing the same bugs.
 
 ### Reference Doc Rules
 
@@ -114,20 +114,28 @@ Core layers are live and actively deployed:
 
 ### What Needs To Happen Next
 
-1. Run migration 006 on Cloud SQL before deploying Phase 2 build
-2. Populate/maintain reference tables (material context, base catalog)
-3. Transition from `metadata.create_all` bootstrap pattern to strict Alembic migration workflow
-4. Add regression tests for API + frontend integration paths
-5. Build catalog/settings pages
-6. Product detail editing (click product header to open spec editor)
+1. Populate/maintain reference tables (material context, base catalog)
+2. Add regression tests for API + frontend integration paths
+3. Build catalog/settings pages
+4. Wire component bdft into species pipeline (base lumber pricing)
+5. Species assignment UI (set $/bdft per species)
+6. Stone pricing UI (set total cost per stone type)
 
 ### Frontend UX Notes (Current)
 
 1. Quote Builder uses a spreadsheet-style canvas: block rows × product columns
-2. Cost blocks and labor blocks are managed at the quote level with per-product membership
-3. Built-in blocks (species, stone, rate labor) are auto-created by pipelines — users edit rates, not block structure
-4. Side panel shows summary, shipping, and shared pool management
-5. Cost block `fixed` semantics: `cost_pp = cost_per_unit * units_per_product`
+2. **Product header area** is row-based: Summary (read-only), Table Title (with tag/location), then collapsible Specs / Top Descriptions / Base Descriptions / Material Builder sections
+3. **Field labels in sticky left column**, bare inputs in product columns — one row per field, aligned across all products
+4. **Combined-field rows** for Length|Width|Height and Base Type|Bases Per Top
+5. **Top Descriptions** with material-type-aware sub-sections (Finishes, Edge, Other) + dynamic detail/exception items
+6. **Base Descriptions** with base-type-aware fields (Stock Base vs Custom Base) + dynamic detail/exception items
+7. Cost blocks organized under Material Costs / Base Costs / Project Costs sections
+8. Labor blocks organized under 12 labor center sections (101 Processing through 111 Packing + Loading)
+9. Built-in blocks (species, stone, rate labor) are auto-created by pipelines — users edit rates, not block structure
+10. Cost block multiplier types: Units (flat), Pieces (per-product count), Per Base. Per Sq Ft / Per Bd Ft are pipeline-only (not in UI dropdowns)
+11. Tags dropdown on all blocks (Top, Base, Shipping, General)
+12. Light neumorphic theme with #49554C green accent
+13. Side panel shows summary, shipping
 
 ---
 
@@ -238,10 +246,10 @@ PT = Product Total (PP × Quantity)
 ### Three block patterns:
 
 1. **Unit Block:** `value × multiplier → PP → PT`
-   - Multiplier types: fixed, per_base, per_sqft, per_bdft
+   - Multiplier types: per_unit/fixed (flat), per_piece (member-level count), per_base, per_sqft (pipeline), per_bdft (pipeline)
 
 2. **Group Block:** `lump_sum ÷ proportional_metric → PP`
-   - Distribution types: units, sqft, bdft
+   - Distribution types: units, sqft
    - Rate = total / sum(all member metrics)
    - PP = member_metric / qty × rate
 
@@ -300,15 +308,37 @@ PT = Product Total (PP × Quantity)
 │   │   ├── summary.py        ← Aggregated cost/labor summary for side panel
 │   │   ├── species.py        ← Species assignment pricing
 │   │   ├── stone.py          ← Stone assignment pricing
-│   │   └── components.py     ← Product component (Material Builder) CRUD
+│   │   ├── components.py     ← Product component (Material Builder) CRUD
+│   │   ├── tags.py           ← Tags list + create (Top, Base, Shipping, etc.)
+│   │   └── description_items.py ← Product description detail/exception CRUD
 │   └── services/
 │       └── quote_service.py  ← Load → convert → compute → save orchestrator
-├── calc_engine.py             ← Pure calculation functions (27 tests passing)
+├── alembic/versions/          ← Migrations (006–009 active)
+├── calc_engine.py             ← Pure calculation functions (71 tests passing)
 ├── test_calc_engine.py        ← pytest test suite
-├── schema_v1.sql              ← PostgreSQL DDL (16 tables + seeds + triggers)
+├── schema_v1.sql              ← PostgreSQL DDL (initial schema, superseded by migrations)
 ├── requirements.txt           ← Python dependencies
 ├── Dockerfile                 ← Cloud Run container
 ├── .env.example               ← Environment variable template
+│
+├── frontend/src/components/
+│   ├── QuoteCanvas.jsx        ← Main grid orchestrator (specs, descriptions, blocks, pricing)
+│   ├── ProductHeaderRow.jsx   ← Product title + meta header cells
+│   ├── ProductSummaryRow.jsx  ← Read-only summary (dims, shape, material, base)
+│   ├── ProductTitleRow.jsx    ← Table title + tag/location button
+│   ├── ProductFieldRow.jsx    ← Label + per-product input cells (single field)
+│   ├── ProductFieldCell.jsx   ← Self-contained input with local state + blur save
+│   ├── ProductMultiFieldRow.jsx ← Combined fields on one row (Length|Width|Height)
+│   ├── ProductMaterialRow.jsx ← Material search + inline lumber thickness
+│   ├── DescriptionSubSection.jsx ← Collapsible sub-section with detail/exception items
+│   ├── MaterialBuilder.jsx    ← Product component editor (plank, leg, apron, metal)
+│   ├── MaterialSearch.jsx     ← Autocomplete for material_detail field
+│   ├── BlockRow.jsx           ← Block label cell + per-product member cells
+│   ├── BlockRowCost.jsx       ← Cost block config (type, multiplier, tag)
+│   ├── BlockRowLabor.jsx      ← Labor block config (type, rate, metric, tag)
+│   ├── RatesRow.jsx           ← Collapsible margin rates section
+│   ├── PricingRow.jsx         ← Pricing rows (hourly rate, costs, prices, rep)
+│   └── SidePanel.jsx          ← Quote stats + summary + shipping
 │
 │   ── Reference Docs (from the original Google Sheets system) ──
 ├── Quote_Sheet_Formula_Map.md ← CRITICAL: Every formula in the 1,682-row Pricing sheet
@@ -365,6 +395,14 @@ All endpoints are prefixed with `/api`.
 | DELETE | `/blocks/{id}/members/{product_id}` | Remove product from block |
 | GET | `/defaults` | Get system defaults |
 | PATCH | `/defaults` | Update system defaults |
+| POST | `/products/{id}/components` | Add component (Material Builder) |
+| PATCH | `/products/{id}/components/{id}` | Update component |
+| DELETE | `/products/{id}/components/{id}` | Remove component |
+| POST | `/products/{id}/description-items` | Add detail/exception item |
+| PATCH | `/products/{id}/description-items/{id}` | Update detail/exception |
+| DELETE | `/products/{id}/description-items/{id}` | Remove detail/exception |
+| GET | `/tags` | List all tags |
+| POST | `/tags` | Create a new tag |
 | GET | `/catalog` | Search stock base catalog |
 | GET | `/catalog/{id}` | Get catalog item |
 | GET | `/material-context` | All material types + UI config |
