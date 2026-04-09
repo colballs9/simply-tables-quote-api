@@ -88,7 +88,7 @@
 
   /* ── Typography ── */
   --font-body: 'DM Sans', -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'Inter', -apple-system, sans-serif;
 
   /* ── Spacing ── */
   --radius-sm: 6px;
@@ -1234,43 +1234,74 @@ a:hover { color: var(--green-700); }
 /* ── Section Headers ── */
 
 .canvas-section-header {
-  padding: 10px 8px 6px;
+  padding: 10px 12px 8px;
   display: flex;
   align-items: center;
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
 }
 
 .canvas-section-header span {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.canvas-section-header--cost span { color: var(--text-primary); }
-.canvas-section-header--labor span { color: var(--text-primary); }
+.canvas-section-header--cost {
+  background: var(--orange-500);
+}
+.canvas-section-header--cost span { color: #fff; }
+
+.canvas-section-header--labor {
+  background: var(--purple-600);
+}
+.canvas-section-header--labor span { color: #fff; }
+
 .canvas-section-header--pricing span { color: var(--green-300); }
 
 /* ── Sub-section Headers (Material Costs, labor centers, etc.) ── */
 
 .canvas-subsection-header {
-  padding: 4px 8px 3px 20px;
+  padding: 6px 8px 5px 12px;
   display: flex;
   align-items: center;
   gap: 6px;
+  border-bottom: 1px solid var(--border);
 }
 
 .canvas-subsection-label {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .canvas-subsection-header--cost .canvas-subsection-label { color: var(--cost-text); }
 .canvas-subsection-header--labor .canvas-subsection-label { color: var(--hours-text); }
 
-/* Empty / inactive sub-sections: slightly smaller but still readable */
+/* Parent header (Material Costs) */
+.canvas-subsection-header--parent {
+  border-bottom: 2px solid var(--cost-border);
+  padding-left: 12px;
+  margin-top: 2px;
+}
+
+/* Child sub-section (Hardwood, Stone) */
+.canvas-subsection-header--child {
+  padding-left: 20px;
+  border-bottom: none;
+}
+
+.canvas-subsection-header--child .canvas-subsection-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+/* Empty / inactive sub-sections */
 .canvas-subsection-header--empty .canvas-subsection-label {
-  opacity: 0.7;
+  opacity: 0.5;
 }
 
 /* Inline "+" button for empty sub-sections */
@@ -2984,6 +3015,9 @@ a:hover { color: var(--green-700); }
 
 /* ── Rates Section Header ── */
 
+.canvas-section-header--rates {
+  background: var(--neutral-200);
+}
 .canvas-section-header--rates span {
   color: var(--text-secondary);
 }
