@@ -328,9 +328,11 @@ def compute_cost_block(block: dict, member: dict, product: dict) -> dict:
     if multiplier_type == "per_base":
         multiplier = _d(product.get("bases_per_top", 1))
     elif multiplier_type == "per_sqft":
-        multiplier = _d(product.get("sq_ft", 0))
+        # Member override (pipeline stores per-group sqft) → product sq_ft fallback
+        multiplier = _d(member.get("units_per_product") if member.get("units_per_product") is not None else product.get("sq_ft", 0))
     elif multiplier_type == "per_bdft":
-        multiplier = _d(product.get("bd_ft", 0))
+        # Member override (pipeline stores per-species bdft) → product bd_ft fallback
+        multiplier = _d(member.get("units_per_product") if member.get("units_per_product") is not None else product.get("bd_ft", 0))
     elif multiplier_type == "per_piece":
         # Pieces mode: use member-level units_per_product (pieces per table)
         multiplier = _d(member.get("units_per_product") if member.get("units_per_product") is not None else block.get("units_per_product", 1))

@@ -241,15 +241,13 @@ function SpeciesDetailRows({ block, products, memberMap, pricePer }) {
   })
 
   // Totals
-  const totalTopBdft = breakdown.reduce((s, b) => {
+  const totalTopBdft = breakdown.reduce((s, b, idx) => {
     if (b.topBdft == null) return s
-    const prod = products[breakdown.indexOf(b)]
-    return s + b.topBdft * (prod?.quantity || 1)
+    return s + b.topBdft * (products[idx]?.quantity || 1)
   }, 0)
-  const totalCompBdft = breakdown.reduce((s, b) => {
+  const totalCompBdft = breakdown.reduce((s, b, idx) => {
     if (b.compBdft == null) return s
-    const prod = products[breakdown.indexOf(b)]
-    return s + b.compBdft * (prod?.quantity || 1)
+    return s + b.compBdft * (products[idx]?.quantity || 1)
   }, 0)
 
   const price = pricePer || 0
