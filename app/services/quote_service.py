@@ -752,17 +752,20 @@ async def manage_stone_pipeline(db: AsyncSession, quote: Quote) -> None:
             for product in option.products:
                 pid = str(product.id)
                 if pid in product_stone:
-                    sk, _ = product_stone[pid]
+                    sk, sq_ft = product_stone[pid]
                     if sk == stone_key:
                         needed_pids.add(pid)
-                        if pid not in existing_members:
+                        if pid in existing_members:
+                            m = existing_members[pid]
+                            m.units_per_product = float(sq_ft)
+                        else:
                             m = QuoteBlockMember(
                                 quote_block_id=block.id,
                                 product_id=product.id,
+                                units_per_product=float(sq_ft),
                             )
                             db.add(m)
                             # Don't append to block.members — triggers lazy load in async.
-                    # db.add(m) with FK is sufficient; load_full_quote reloads eagerly.
 
         # Remove stale members
         for pid, m in existing_members.items():

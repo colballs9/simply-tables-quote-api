@@ -2138,6 +2138,62 @@ a:hover { color: var(--green-700); }
   justify-items: center;
 }
 
+/* ── Stone Block ── */
+
+.canvas-cell--stone {
+  border-left-color: var(--cost-border);
+}
+
+.canvas-cell--stone-value {
+  background: rgba(154, 98, 24, 0.04);
+}
+
+.stone-spec-line {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stone-cost-input {
+  width: 80px;
+}
+
+.stone-unit {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+
+.stone-group-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cost-border);
+  color: white;
+  font-size: 0.55rem;
+  font-weight: 700;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* ── Material Costs sub-section headers ── */
+
+.canvas-subsection-header--parent {
+  font-weight: 700;
+}
+
+.canvas-subsection-header--child {
+  padding-left: 12px;
+  font-size: 0.7rem;
+}
+
 .canvas-unit-pp {
   font-family: var(--font-mono);
   font-size: 0.7rem;

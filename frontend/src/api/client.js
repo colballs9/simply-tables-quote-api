@@ -111,6 +111,13 @@ export const species = {
   updatePrice: (quoteId, speciesKey, data) => request(`/quotes/${quoteId}/species/${encodeURIComponent(speciesKey)}`, { method: 'PATCH', body: data }),
 };
 
+// ── Stone ──
+
+export const stone = {
+  list: (quoteId) => request(`/quotes/${quoteId}/stone`),
+  updateCost: (quoteId, stoneKey, data) => request(`/quotes/${quoteId}/stone/${encodeURIComponent(stoneKey)}`, { method: 'PATCH', body: data }),
+};
+
 // ── Catalog & Context ──
 
 export const catalog = {

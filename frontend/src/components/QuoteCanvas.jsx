@@ -11,6 +11,7 @@ import MaterialBuilder from './MaterialBuilder'
 import DescriptionSubSection from './DescriptionSubSection'
 import BlockRow from './BlockRow'
 import SpeciesBlockRow from './SpeciesBlockRow'
+import StoneBlockRow from './StoneBlockRow'
 import RatesRow from './RatesRow'
 import PricingRow from './PricingRow'
 
@@ -85,7 +86,8 @@ const CUSTOM_BASE_FIELDS = [
 ]
 
 const COST_SECTIONS = [
-  { key: 'material', label: 'Material Costs', categories: ['species', 'stone'] },
+  { key: 'hardwood', label: 'Hardwood', categories: ['species'], parent: 'material' },
+  { key: 'stone', label: 'Stone', categories: ['stone'], parent: 'material' },
   { key: 'base', label: 'Base Costs', categories: ['stock_base', 'custom_base', 'powder_coat', 'stock_base_shipping'] },
   { key: 'project', label: 'Project Costs', categories: ['unit_cost', 'group_cost', 'misc', 'consumables'] },
 ]
@@ -106,7 +108,8 @@ const LABOR_SECTIONS = [
 ]
 
 const COST_SECTION_DEFAULTS = {
-  material: 'species',
+  hardwood: 'species',
+  stone: 'stone',
   base: 'stock_base',
   project: 'unit_cost',
 }
@@ -135,6 +138,22 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
     })
     return map
   }, [quote?.species_assignments])
+
+  const stoneAssignmentMap = useMemo(() => {
+    const map = {}
+    ;(quote?.stone_assignments || []).forEach(sa => {
+      map[sa.stone_key] = sa
+    })
+    return map
+  }, [quote?.stone_assignments])
+
+  // Stone group numbering: stone_key → group number (1, 2, 3...)
+  const stoneGroupNumbers = useMemo(() => {
+    const map = {}
+    const keys = Object.keys(stoneAssignmentMap).sort()
+    keys.forEach((key, i) => { map[key] = i + 1 })
+    return map
+  }, [stoneAssignmentMap])
 
   const costBlocksBySection = useMemo(() => {
     const costBlocks = allBlocks.filter(b => b.block_domain === 'cost')
@@ -240,7 +259,7 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
         />
 
         {/* ═══ SUMMARY ═══ */}
-        <ProductSummaryRow products={sortedProducts} />
+        <ProductSummaryRow products={sortedProducts} stoneGroupNumbers={stoneGroupNumbers} />
 
         {/* ═══ TABLE TITLE ═══ */}
         <ProductTitleRow products={sortedProducts} optionId={optionId} onQuoteUpdate={onQuoteUpdate} />
@@ -361,23 +380,33 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
           <span>Cost Blocks</span>
         </div>
 
-        {COST_SECTIONS.map(section => {
+        {COST_SECTIONS.map((section, sIdx) => {
           const blocks = costBlocksBySection[section.key] || []
           const isEmpty = blocks.length === 0
+          // Insert "Material Costs" parent header before first material sub-section
+          const showMaterialHeader = section.parent === 'material' && sIdx === 0
+          const isNextAlsoMaterial = COST_SECTIONS[sIdx + 1]?.parent === 'material'
           return (
             <div key={section.key} className="canvas-subsection" style={{ gridColumn: '1 / -1', display: 'contents' }}>
+              {showMaterialHeader && (
+                <div className="canvas-subsection-header canvas-subsection-header--cost canvas-subsection-header--parent" style={{ gridColumn: '1 / -1' }}>
+                  <span className="canvas-subsection-label">Material Costs</span>
+                </div>
+              )}
               <div
-                className={`canvas-subsection-header canvas-subsection-header--cost ${isEmpty ? 'canvas-subsection-header--empty' : ''}`}
+                className={`canvas-subsection-header canvas-subsection-header--cost ${section.parent ? 'canvas-subsection-header--child' : ''} ${isEmpty ? 'canvas-subsection-header--empty' : ''}`}
                 style={{ gridColumn: '1 / -1' }}
               >
                 <span className="canvas-subsection-label">{section.label}</span>
-                <button
-                  className="canvas-subsection-add-btn canvas-subsection-add-btn--cost"
-                  onClick={() => handleAddCostBlock(section.key)}
-                  title={`Add ${section.label.toLowerCase()} block`}
-                >
-                  <Plus size={12} />
-                </button>
+                {!section.parent && (
+                  <button
+                    className="canvas-subsection-add-btn canvas-subsection-add-btn--cost"
+                    onClick={() => handleAddCostBlock(section.key)}
+                    title={`Add ${section.label.toLowerCase()} block`}
+                  >
+                    <Plus size={12} />
+                  </button>
+                )}
               </div>
 
               {blocks.map(block => (
@@ -388,6 +417,16 @@ export default function QuoteCanvas({ quote, activeOption, onQuoteUpdate }) {
                     products={sortedProducts}
                     quoteId={quote.id}
                     speciesAssignment={speciesAssignmentMap[block.label]}
+                    onQuoteUpdate={onQuoteUpdate}
+                  />
+                ) : block.is_builtin && block.cost_category === 'stone' ? (
+                  <StoneBlockRow
+                    key={block.id}
+                    block={block}
+                    products={sortedProducts}
+                    quoteId={quote.id}
+                    stoneAssignment={stoneAssignmentMap[block.label]}
+                    stoneNumber={stoneGroupNumbers[block.label] || 1}
                     onQuoteUpdate={onQuoteUpdate}
                   />
                 ) : (

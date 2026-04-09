@@ -29,7 +29,7 @@ async def list_stone_assignments(
     return result.scalars().all()
 
 
-@router.patch("/quotes/{quote_id}/stone/{stone_key}", response_model=QuoteRead)
+@router.patch("/quotes/{quote_id}/stone/{stone_key:path}", response_model=QuoteRead)
 async def update_stone_assignment(
     quote_id: uuid.UUID,
     stone_key: str,
