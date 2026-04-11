@@ -841,12 +841,14 @@ async def manage_stock_base_pipeline(db: AsyncSession, quote: Quote) -> None:
 
     for bdef in BLOCK_DEFS:
         label = bdef["label"]
+        is_new_block = False
         if label in existing_blocks:
             block = existing_blocks.pop(label)
             # Update tag on existing block if not set
             if bdef["tag_id"] and not block.tag_id:
                 block.tag_id = bdef["tag_id"]
         else:
+            is_new_block = True
             block = QuoteBlock(
                 quote_id=quote.id,
                 sort_order=0,
@@ -867,8 +869,10 @@ async def manage_stock_base_pipeline(db: AsyncSession, quote: Quote) -> None:
         await db.flush()
 
         # Sync members
-        is_new = label not in {b.label for b in quote.quote_blocks if b.is_builtin and b.id != block.id}
-        existing_members = {str(m.product_id): m for m in block.members} if block.members else {}
+        existing_members: dict[str, QuoteBlockMember] = (
+            {} if is_new_block
+            else {str(m.product_id): m for m in block.members}
+        )
 
         needed = set(stock_base_pids)
         for pid in needed:

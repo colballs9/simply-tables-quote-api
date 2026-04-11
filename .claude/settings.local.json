@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /Users/colinkettler/dev/simply-tables/simply-tables-quote-api/app/*.py /Users/colinkettler/dev/simply-tables/simply-tables-quote-api/calc_engine.py /Users/colinkettler/dev/simply-tables/simply-tables-quote-api/app/routers/*.py)",
+      "Bash(wc -l /Users/colinkettler/dev/simply-tables/simply-tables-quote-api/frontend/src/pages/*.jsx /Users/colinkettler/dev/simply-tables/simply-tables-quote-api/frontend/src/components/*.jsx)",
+      "Bash(wc -l /Users/colinkettler/dev/simply-tables/simply-tables-quote-api/frontend/src/pages/* /Users/colinkettler/dev/simply-tables/simply-tables-quote-api/frontend/src/components/*)",
+      "Bash(python -m pytest test_calc_engine.py -v)",
+      "Bash(python3 -m pytest test_calc_engine.py -v)",
+      "Bash(python3 -m pytest test_calc_engine.py::TestFarmhouseKitchen0737 -v)",
+      "Bash(python3 -m pytest test_calc_engine.py -q)",
+      "Bash(python3 -c \"import sys; sys.path.insert\\(0, '.'\\); from app.routers.debug import router; print\\('debug router imports OK'\\)\")",
+      "Bash(gcloud run:*)",
+      "Bash(npx vite:*)"
+    ]
+  }
+}
